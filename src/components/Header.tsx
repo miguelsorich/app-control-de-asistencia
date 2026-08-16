@@ -1,5 +1,6 @@
 import React from 'react';
 import { UserCheck, LayoutGrid, Home } from 'lucide-react';
+import { SupabaseSyncBadge } from './SupabaseSyncBadge';
 
 interface HeaderProps {
   onOpenAddModal?: () => void;
@@ -9,12 +10,16 @@ interface HeaderProps {
   onChangeTab: (tab: 'MAIN' | 'DOCENTE' | 'ESTUDIANTE') => void;
   activeSubjectName?: string | null;
   onNavigateHome?: () => void;
+  onManualSync?: () => void;
+  isSyncing?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onChangeTab,
   onNavigateHome,
+  onManualSync,
+  isSyncing,
 }) => {
   return (
     <header id="header-uagrm" className="bg-[#174EAF] text-white border-b border-[#103B88] shadow-sm">
@@ -62,8 +67,10 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Switcher */}
+          {/* Controls: Supabase Badge & Navigation Switcher */}
           <div className="flex items-center gap-2 sm:gap-3 self-start lg:self-auto flex-wrap">
+            <SupabaseSyncBadge onManualSync={onManualSync} isSyncing={isSyncing} />
+
             <div className="bg-[#103B88] p-1 rounded-xl border border-white/15 flex items-center gap-1">
               <button
                 id="tab-nav-inicio"
@@ -114,4 +121,5 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+
 

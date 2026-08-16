@@ -1,6 +1,6 @@
 {
   "name": "Control de Asistencia UAGRM",
-  "description": "Sistema de control de asistencia universitaria UAGRM con pantalla principal de acceso, portal estudiante, portal docente/administrador, gestión de asignaturas, importación, habilitación, reportes y notas (Módulos 1 al 10).",
+  "description": "Sistema de control de asistencia universitaria UAGRM con integración a base de datos en tiempo real Supabase PostgreSQL, pantalla principal de acceso, portal estudiante, portal docente, gestión de asignaturas, importación, habilitación, reportes y notas.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

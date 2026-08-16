@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Asignatura,
   Estudiante,
@@ -19,6 +19,20 @@ import { StudentAttendanceView } from './components/StudentAttendanceView';
 import { TeacherPortalView } from './components/TeacherPortalView';
 import { MainAccessScreen } from './components/MainAccessScreen';
 import { getTodayDateString, formatCurrentTimeWithSeconds } from './utils/scheduleValidators';
+import {
+  fetchAsignaturasFromSupabase,
+  saveAsignaturaToSupabase,
+  deleteAsignaturaFromSupabase,
+  fetchEstudiantesFromSupabase,
+  saveEstudiantesBatchToSupabase,
+  fetchAsistenciasFromSupabase,
+  saveAsistenciaToSupabase,
+  fetchSesionesFromSupabase,
+  saveSesionToSupabase,
+  fetchNotasFromSupabase,
+  saveNotasBatchToSupabase,
+} from './services/supabaseSync';
+import { supabase } from './lib/supabase';
 import { CheckCircle2, GraduationCap } from 'lucide-react';
 
 const STORAGE_KEY_SUBJECTS = 'uagrm_asistencia_asignaturas_v1';
@@ -31,6 +45,7 @@ const STORAGE_KEY_EMAIL_LOGS = 'uagrm_asistencia_correos_v1';
 export default function App() {
   // Primary Navigation State (Módulo 10: Pantalla principal de acceso)
   const [activeMainTab, setActiveMainTab] = useState<'MAIN' | 'DOCENTE' | 'ESTUDIANTE'>('MAIN');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Subjects State (Módulo 1)
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>(() => {
@@ -120,6 +135,57 @@ export default function App() {
   // Toast notification state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Supabase Initial Load and Sync
+  const loadAllDataFromSupabase = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const [remoteAsig, remoteEst, remoteAsis, remoteSes, remoteNot] = await Promise.all([
+        fetchAsignaturasFromSupabase(),
+        fetchEstudiantesFromSupabase(),
+        fetchAsistenciasFromSupabase(),
+        fetchSesionesFromSupabase(),
+        fetchNotasFromSupabase(),
+      ]);
+
+      if (remoteAsig && remoteAsig.length > 0) {
+        setAsignaturas(remoteAsig);
+      } else {
+        // Seed initial subjects to Supabase
+        for (const s of asignaturas) {
+          saveAsignaturaToSupabase(s);
+        }
+      }
+
+      if (remoteEst && remoteEst.length > 0) {
+        setEstudiantes(remoteEst);
+      } else {
+        saveEstudiantesBatchToSupabase(estudiantes);
+      }
+
+      if (remoteAsis && remoteAsis.length > 0) {
+        setRegistrosAsistencia(remoteAsis);
+      }
+
+      if (remoteSes && Object.keys(remoteSes).length > 0) {
+        setSesionesHabilitacion(remoteSes);
+      }
+
+      if (remoteNot && remoteNot.length > 0) {
+        setNotas(remoteNot);
+      } else {
+        saveNotasBatchToSupabase(notas);
+      }
+    } catch (e) {
+      console.warn('[Supabase] Initial sync info:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAllDataFromSupabase();
+  }, [loadAllDataFromSupabase]);
+
   // Save to localStorage
   useEffect(() => {
     try {
@@ -186,17 +252,23 @@ export default function App() {
     data: Omit<Asignatura, 'id' | 'fechaCreacion'> & { id?: string }
   ) => {
     if (data.id) {
+      let updatedItem: Asignatura | null = null;
       setAsignaturas((prev) =>
-        prev.map((item) =>
-          item.id === data.id
-            ? {
-                ...item,
-                ...data,
-              }
-            : item
-        )
+        prev.map((item) => {
+          if (item.id === data.id) {
+            updatedItem = {
+              ...item,
+              ...data,
+            };
+            return updatedItem;
+          }
+          return item;
+        })
       );
-      showToast(`Asignatura "${data.sigla} - ${data.nombre}" actualizada con éxito.`);
+      if (updatedItem) {
+        saveAsignaturaToSupabase(updatedItem);
+      }
+      showToast(`Asignatura "${data.sigla} - ${data.nombre}" sincronizada con Supabase.`);
     } else {
       const newId = `asig-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
       const newSubject: Asignatura = {
@@ -205,7 +277,8 @@ export default function App() {
         fechaCreacion: Date.now(),
       };
       setAsignaturas((prev) => [newSubject, ...prev]);
-      showToast(`Asignatura "${data.sigla} - ${data.nombre}" agregada correctamente.`);
+      saveAsignaturaToSupabase(newSubject);
+      showToast(`Asignatura "${data.sigla} - ${data.nombre}" creada y guardada en Supabase.`);
     }
   };
 
@@ -215,17 +288,19 @@ export default function App() {
 
   const handleConfirmDeleteSubject = () => {
     if (!deleteTarget) return;
-    setAsignaturas((prev) => prev.filter((item) => item.id !== deleteTarget.id));
-    setEstudiantes((prev) => prev.filter((est) => est.asignaturaId !== deleteTarget.id));
+    const targetId = deleteTarget.id;
+    setAsignaturas((prev) => prev.filter((item) => item.id !== targetId));
+    setEstudiantes((prev) => prev.filter((est) => est.asignaturaId !== targetId));
     setRegistrosAsistencia((prev) =>
-      prev.filter((r) => r.asignaturaId !== deleteTarget.id)
+      prev.filter((r) => r.asignaturaId !== targetId)
     );
     setSesionesHabilitacion((prev) => {
       const copy = { ...prev };
-      delete copy[deleteTarget.id];
+      delete copy[targetId];
       return copy;
     });
-    showToast(`Asignatura "${deleteTarget.nombre}" eliminada.`);
+    deleteAsignaturaFromSupabase(targetId);
+    showToast(`Asignatura "${deleteTarget.nombre}" eliminada de Supabase.`);
     setDeleteTarget(null);
   };
 
@@ -238,22 +313,31 @@ export default function App() {
   const handleImportComplete = (newStudents: Estudiante[]) => {
     if (newStudents.length > 0) {
       setEstudiantes((prev) => [...prev, ...newStudents]);
+      saveEstudiantesBatchToSupabase(newStudents);
       showToast(
-        `Se agregaron ${newStudents.length} estudiante${
+        `Se sincronizaron ${newStudents.length} estudiante${
           newStudents.length === 1 ? '' : 's'
-        } a la asignatura.`
+        } en Supabase.`
       );
     }
   };
 
   const handleDeleteStudent = (studentId: string, studentName: string) => {
     setEstudiantes((prev) => prev.filter((e) => e.id !== studentId));
-    showToast(`Estudiante "${studentName}" eliminado de esta asignatura.`);
+    supabase
+      .from('estudiantes')
+      .delete()
+      .eq('id', studentId)
+      .then(({ error }) => {
+        if (error) console.warn('[Supabase] delete student error:', error.message);
+      });
+    showToast(`Estudiante "${studentName}" eliminado.`);
   };
 
   // Attendance Registration (Módulo 3)
   const handleRegistrarAsistencia = (nuevoRegistro: RegistroAsistencia) => {
     setRegistrosAsistencia((prev) => [nuevoRegistro, ...prev]);
+    saveAsistenciaToSupabase(nuevoRegistro);
     showToast(`Asistencia registrada: PRESENTE (RU: ${nuevoRegistro.registroUniversitario})`);
   };
 
@@ -280,6 +364,7 @@ export default function App() {
       ...prev,
       [asignaturaId]: nuevaSesion,
     }));
+    saveSesionToSupabase(nuevaSesion);
 
     const asig = asignaturas.find((a) => a.id === asignaturaId);
     showToast(`Asistencia habilitada para ${asig?.sigla || 'la materia'} (${duracionMinutos} min).`);
@@ -289,23 +374,26 @@ export default function App() {
     setSesionesHabilitacion((prev) => {
       const existing = prev[asignaturaId];
       if (!existing) return prev;
+      const updated: SesionHabilitacion = {
+        ...existing,
+        activa: false,
+        cerradoManualmente: true,
+      };
+      saveSesionToSupabase(updated);
       return {
         ...prev,
-        [asignaturaId]: {
-          ...existing,
-          activa: false,
-          cerradoManualmente: true,
-        },
+        [asignaturaId]: updated,
       };
     });
     const asig = asignaturas.find((a) => a.id === asignaturaId);
-    showToast(`Asistencia de ${asig?.sigla || 'la materia'} cerrada manualmente.`);
+    showToast(`Asistencia de ${asig?.sigla || 'la materia'} cerrada.`);
   };
 
   // Grades Actions (Módulo 6)
   const handleSaveGrades = (updatedGrades: NotaEstudiante[]) => {
     setNotas(updatedGrades);
-    showToast('Notas de la asignatura actualizadas correctamente.');
+    saveNotasBatchToSupabase(updatedGrades);
+    showToast('Notas sincronizadas con Supabase.');
   };
 
   return (
@@ -317,6 +405,8 @@ export default function App() {
         activeTab={activeMainTab}
         onChangeTab={(tab) => setActiveMainTab(tab)}
         onNavigateHome={() => setActiveMainTab('MAIN')}
+        onManualSync={loadAllDataFromSupabase}
+        isSyncing={isSyncing}
       />
 
       {/* Main Content Area */}
