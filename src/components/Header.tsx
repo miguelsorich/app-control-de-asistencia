@@ -1,12 +1,12 @@
 import React from 'react';
-import { UserCheck, LayoutGrid } from 'lucide-react';
+import { UserCheck, LayoutGrid, Home } from 'lucide-react';
 
 interface HeaderProps {
   onOpenAddModal?: () => void;
   totalAsignaturas: number;
   totalEstudiantes: number;
-  activeTab: 'DOCENTE' | 'ESTUDIANTE';
-  onChangeTab: (tab: 'DOCENTE' | 'ESTUDIANTE') => void;
+  activeTab: 'MAIN' | 'DOCENTE' | 'ESTUDIANTE';
+  onChangeTab: (tab: 'MAIN' | 'DOCENTE' | 'ESTUDIANTE') => void;
   activeSubjectName?: string | null;
   onNavigateHome?: () => void;
 }
@@ -22,12 +22,12 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 sm:gap-4">
           {/* Logos & Title Container */}
           <div
-            onClick={onNavigateHome}
-            className={`flex items-center gap-3 sm:gap-4 ${onNavigateHome ? 'cursor-pointer' : ''}`}
-            title={onNavigateHome ? 'Ir al inicio' : ''}
+            onClick={onNavigateHome || (() => onChangeTab('MAIN'))}
+            className="flex items-center gap-3 sm:gap-4 cursor-pointer group"
+            title="Ir a la pantalla principal de acceso"
           >
             {/* Logos Group */}
-            <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0 bg-white/95 p-1.5 sm:p-2 rounded-xl shadow-xs border border-white/20">
+            <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0 bg-white/95 p-1.5 sm:p-2 rounded-xl shadow-xs border border-white/20 group-hover:bg-white transition-colors">
               {/* Logo Digital Academy */}
               <img
                 src="/logo_digital_academy.png"
@@ -66,10 +66,39 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-2 sm:gap-3 self-start lg:self-auto flex-wrap">
             <div className="bg-[#103B88] p-1 rounded-xl border border-white/15 flex items-center gap-1">
               <button
+                id="tab-nav-inicio"
+                type="button"
+                onClick={() => onChangeTab('MAIN')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'MAIN'
+                    ? 'bg-white text-[#174EAF] shadow-xs'
+                    : 'text-white/90 hover:text-white hover:bg-white/10'
+                }`}
+                title="Pantalla principal de acceso"
+              >
+                <Home className="w-3.5 h-3.5" />
+                <span>Inicio</span>
+              </button>
+
+              <button
+                id="tab-nav-estudiante"
+                type="button"
+                onClick={() => onChangeTab('ESTUDIANTE')}
+                className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  activeTab === 'ESTUDIANTE'
+                    ? 'bg-white text-[#174EAF] shadow-xs'
+                    : 'text-white/90 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>Portal Estudiante</span>
+              </button>
+
+              <button
                 id="tab-nav-docente"
                 type="button"
                 onClick={() => onChangeTab('DOCENTE')}
-                className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   activeTab === 'DOCENTE'
                     ? 'bg-white text-[#174EAF] shadow-xs'
                     : 'text-white/90 hover:text-white hover:bg-white/10'
@@ -78,20 +107,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <LayoutGrid className="w-3.5 h-3.5" />
                 <span>Portal Docente</span>
               </button>
-
-              <button
-                id="tab-nav-estudiante"
-                type="button"
-                onClick={() => onChangeTab('ESTUDIANTE')}
-                className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'ESTUDIANTE'
-                    ? 'bg-white text-[#174EAF] shadow-xs'
-                    : 'text-white/90 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span>Portal del Estudiante</span>
-              </button>
             </div>
           </div>
         </div>
@@ -99,3 +114,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

@@ -230,7 +230,7 @@ export const SubjectGradesView: React.FC<SubjectGradesViewProps> = ({
                 ) : (
                   asignaturas.map((asig) => (
                     <option key={asig.id} value={asig.id}>
-                      {asig.sigla} - {asig.nombre} (Grupo {asig.grupo})
+                      {asig.sigla} - {asig.nombre} (Grupo {asig.grupo} · Semestre {asig.semestre || 1}/{asig.año || 2026})
                     </option>
                   ))
                 )}
@@ -247,9 +247,9 @@ export const SubjectGradesView: React.FC<SubjectGradesViewProps> = ({
                 <span className="font-bold text-[#172033]">{selectedSubject.sigla}</span> — Grupo {selectedSubject.grupo}
               </div>
               <span className="text-[#DCE3EC]">|</span>
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-[#667085]" />
-                <span>{selectedSubject.modalidad === 'LUN_MIE_VIE' ? 'Lun - Mié - Vie' : selectedSubject.modalidad === 'MAR_JUE' ? 'Mar - Jue' : 'Sábado'}</span>
+              <div className="flex items-center gap-1.5 font-medium">
+                <Calendar className="w-3.5 h-3.5 text-[#174EAF]" />
+                <span className="font-semibold text-[#172033]">Semestre {selectedSubject.semestre || 1} · {selectedSubject.año || 2026}</span>
               </div>
               <span className="text-[#DCE3EC]">|</span>
               <div className="flex items-center gap-1.5">

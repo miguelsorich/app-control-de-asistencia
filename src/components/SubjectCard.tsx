@@ -56,6 +56,9 @@ export const SubjectCard: React.FC<SubjectCardProps> = ({
               <Users className="w-3 h-3 text-[#174EAF]" />
               Grupo {asignatura.grupo}
             </span>
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#F5F7FA] text-[#172033] border border-[#DCE3EC]">
+              Semestre {asignatura.semestre || 1} · {asignatura.año || 2026}
+            </span>
             {asignatura.aula && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-[#667085] bg-[#F5F7FA] border border-[#DCE3EC]">
                 <MapPin className="w-3 h-3 text-[#667085]" />

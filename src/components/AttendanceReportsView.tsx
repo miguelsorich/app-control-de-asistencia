@@ -160,7 +160,7 @@ export const AttendanceReportsView: React.FC<AttendanceReportsViewProps> = ({
               >
                 {asignaturas.map((asig) => (
                   <option key={asig.id} value={asig.id}>
-                    {asig.sigla} - {asig.nombre} (Grupo {asig.grupo})
+                    {asig.sigla} - {asig.nombre} (Grupo {asig.grupo} · Semestre {asig.semestre || 1}/{asig.año || 2026})
                   </option>
                 ))}
               </select>
@@ -172,6 +172,13 @@ export const AttendanceReportsView: React.FC<AttendanceReportsViewProps> = ({
                 <span className="text-[#667085] text-[11px] block font-medium">Materia:</span>
                 <span className="font-bold text-[#172033]">
                   {selectedSubject.sigla} - {selectedSubject.nombre} (G{selectedSubject.grupo})
+                </span>
+              </div>
+              <div className="h-6 w-px bg-[#DCE3EC] hidden sm:block" />
+              <div>
+                <span className="text-[#667085] text-[11px] block font-medium">Periodo:</span>
+                <span className="font-semibold text-[#172033]">
+                  Semestre {selectedSubject.semestre || 1} · {selectedSubject.año || 2026}
                 </span>
               </div>
               <div className="h-6 w-px bg-[#DCE3EC] hidden sm:block" />

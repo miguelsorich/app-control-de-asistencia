@@ -150,7 +150,7 @@ export const ImportGradesModal: React.FC<ImportGradesModalProps> = ({
             <div>
               <h2 className="text-base font-bold">Importar Notas desde Excel (6 Columnas)</h2>
               <p className="text-xs text-[#E8F0FC]/80">
-                {asignatura.sigla} - {asignatura.nombre} (Grupo {asignatura.grupo})
+                {asignatura.sigla} - {asignatura.nombre} (Grupo {asignatura.grupo} · Semestre {asignatura.semestre || 1}/{asignatura.año || 2026})
               </p>
             </div>
           </div>

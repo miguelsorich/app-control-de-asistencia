@@ -49,6 +49,8 @@ interface TeacherPortalViewProps {
   onHabilitarAsistencia: (asignaturaId: string, duracionMinutos: number) => void;
   onCerrarAsistencia: (asignaturaId: string) => void;
   onSaveGrades: (updatedGrades: NotaEstudiante[]) => void;
+  onVolverPrincipal?: () => void;
+  onLogoutToMain?: () => void;
 }
 
 export type DocenteSection =
@@ -73,6 +75,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   onHabilitarAsistencia,
   onCerrarAsistencia,
   onSaveGrades,
+  onVolverPrincipal,
+  onLogoutToMain,
 }) => {
   // ==========================================
   // MÓDULO 9: AUTENTICACIÓN DEL DOCENTE
@@ -120,16 +124,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     setLoginError(null);
     setActiveSection('DASHBOARD');
     setSelectedSubjectForStudentsId(null);
+    if (onLogoutToMain) {
+      onLogoutToMain();
+    }
   };
 
   // Filtered subjects for Section 1 (Gestión de Asignaturas)
   const filteredAsignaturas = useMemo(() => {
     return asignaturas.filter((asig) => {
       const term = searchTermAsignaturas.toLowerCase();
+      const semStr = `semestre ${asig.semestre || 1}`;
+      const anioStr = String(asig.año || 2026);
       const matchesSearch =
         asig.nombre.toLowerCase().includes(term) ||
         asig.sigla.toLowerCase().includes(term) ||
-        asig.grupo.toLowerCase().includes(term);
+        asig.grupo.toLowerCase().includes(term) ||
+        semStr.includes(term) ||
+        anioStr.includes(term);
 
       const matchesModalidad =
         selectedModalidadFilter === 'TODAS' || asig.modalidad === selectedModalidadFilter;
@@ -254,6 +265,21 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               <ChevronRight className="w-4 h-4" />
             </button>
           </form>
+
+          {/* Volver a la pantalla principal de acceso */}
+          {onVolverPrincipal && (
+            <div className="pt-2 border-t border-[#DCE3EC] text-center">
+              <button
+                id="btn-teacher-volver-principal"
+                type="button"
+                onClick={onVolverPrincipal}
+                className="text-xs font-semibold text-[#174EAF] hover:text-[#103B88] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Volver a la pantalla principal</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -625,12 +651,17 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                   className="bg-white rounded-xl border border-[#DCE3EC] hover:border-[#174EAF] p-5 shadow-2xs hover:shadow-xs transition-all space-y-4 flex flex-col justify-between"
                 >
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="bg-[#174EAF] text-white text-xs font-mono font-bold px-2 py-0.5 rounded">
-                        {asig.sigla}
-                      </span>
-                      <span className="bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC] text-xs font-bold px-2 py-0.5 rounded">
-                        Grupo {asig.grupo}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="bg-[#174EAF] text-white text-xs font-mono font-bold px-2 py-0.5 rounded">
+                          {asig.sigla}
+                        </span>
+                        <span className="bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC] text-xs font-bold px-2 py-0.5 rounded">
+                          Grupo {asig.grupo}
+                        </span>
+                      </div>
+                      <span className="bg-[#F5F7FA] text-[#172033] border border-[#DCE3EC] text-[11px] font-semibold px-2 py-0.5 rounded">
+                        Semestre {asig.semestre || 1} · {asig.año || 2026}
                       </span>
                     </div>
 
@@ -747,11 +778,16 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                   className="bg-white hover:bg-[#E8F0FC]/40 border border-[#DCE3EC] hover:border-[#174EAF] rounded-xl p-4 cursor-pointer transition-all space-y-2 group shadow-2xs"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-mono font-bold text-xs bg-[#174EAF] text-white px-2 py-0.5 rounded">
-                      {asig.sigla}
-                    </span>
-                    <span className="text-xs font-bold text-[#172033] bg-[#E8F0FC] border border-[#DCE3EC] px-2 py-0.5 rounded">
-                      Gr. {asig.grupo}
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-xs bg-[#174EAF] text-white px-2 py-0.5 rounded">
+                        {asig.sigla}
+                      </span>
+                      <span className="text-xs font-bold text-[#172033] bg-[#E8F0FC] border border-[#DCE3EC] px-2 py-0.5 rounded">
+                        Gr. {asig.grupo}
+                      </span>
+                    </div>
+                    <span className="text-[11px] font-semibold text-[#667085] bg-[#F5F7FA] border border-[#DCE3EC] px-2 py-0.5 rounded">
+                      Sem. {asig.semestre || 1}/{asig.año || 2026}
                     </span>
                   </div>
                   <h4 className="font-bold text-sm text-[#172033] group-hover:text-[#174EAF] transition-colors">

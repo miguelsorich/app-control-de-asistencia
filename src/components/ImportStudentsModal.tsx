@@ -139,10 +139,13 @@ export const ImportStudentsModal: React.FC<ImportStudentsModalProps> = ({
               <Upload className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-lg font-bold">Importar Lista de Estudiantes</h2>
                 <span className="bg-[#E8F0FC] text-[#174EAF] text-xs px-2.5 py-0.5 rounded-lg font-mono font-bold">
                   {asignatura.sigla} - Grupo {asignatura.grupo}
+                </span>
+                <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-lg font-medium">
+                  Semestre {asignatura.semestre || 1} · {asignatura.año || 2026}
                 </span>
               </div>
               <p className="text-xs text-[#E8F0FC]/80 line-clamp-1">

@@ -17,6 +17,7 @@ import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ImportStudentsModal } from './components/ImportStudentsModal';
 import { StudentAttendanceView } from './components/StudentAttendanceView';
 import { TeacherPortalView } from './components/TeacherPortalView';
+import { MainAccessScreen } from './components/MainAccessScreen';
 import { getTodayDateString, formatCurrentTimeWithSeconds } from './utils/scheduleValidators';
 import { CheckCircle2, GraduationCap } from 'lucide-react';
 
@@ -28,15 +29,22 @@ const STORAGE_KEY_GRADES = 'uagrm_asistencia_notas_v1';
 const STORAGE_KEY_EMAIL_LOGS = 'uagrm_asistencia_correos_v1';
 
 export default function App() {
-  // Primary Navigation State: Portal Docente / Portal Estudiante
-  const [activeMainTab, setActiveMainTab] = useState<'DOCENTE' | 'ESTUDIANTE'>('DOCENTE');
+  // Primary Navigation State (Módulo 10: Pantalla principal de acceso)
+  const [activeMainTab, setActiveMainTab] = useState<'MAIN' | 'DOCENTE' | 'ESTUDIANTE'>('MAIN');
 
   // Subjects State (Módulo 1)
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SUBJECTS);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => ({
+            ...item,
+            semestre: item.semestre === 2 ? 2 : 1,
+            año: item.año ? Number(item.año) : (item.anio ? Number(item.anio) : 2026),
+          }));
+        }
       }
     } catch (e) {
       console.error('Error loading subjects from localStorage:', e);
@@ -302,18 +310,29 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] text-[#172033] flex flex-col font-sans">
-      {/* Header with Navigation between Portal Docente and Portal del Estudiante */}
+      {/* Header with Navigation between Inicio, Portal Estudiante and Portal Docente */}
       <Header
         totalAsignaturas={asignaturas.length}
         totalEstudiantes={estudiantes.length}
         activeTab={activeMainTab}
         onChangeTab={(tab) => setActiveMainTab(tab)}
-        onNavigateHome={() => setActiveMainTab('DOCENTE')}
+        onNavigateHome={() => setActiveMainTab('MAIN')}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {activeMainTab === 'ESTUDIANTE' ? (
+        {activeMainTab === 'MAIN' ? (
+          /* ==========================================
+             MÓDULO 10: PANTALLA PRINCIPAL DE ACCESO
+             Punto de entrada inicial del sistema
+             ========================================== */
+          <MainAccessScreen
+            onSelectEstudiante={() => setActiveMainTab('ESTUDIANTE')}
+            onSelectDocente={() => setActiveMainTab('DOCENTE')}
+            totalAsignaturas={asignaturas.length}
+            totalEstudiantes={estudiantes.length}
+          />
+        ) : activeMainTab === 'ESTUDIANTE' ? (
           /* ==========================================
              PORTAL DEL ESTUDIANTE (MÓDULOS 3, 6 Y 8)
              ========================================== */
@@ -324,7 +343,9 @@ export default function App() {
             sesionesHabilitacion={sesionesHabilitacion}
             notas={notas}
             onRegistrarAsistencia={handleRegistrarAsistencia}
+            onVolverPrincipal={() => setActiveMainTab('MAIN')}
             onVolverDocente={() => setActiveMainTab('DOCENTE')}
+            onLogoutToMain={() => setActiveMainTab('MAIN')}
           />
         ) : (
           /* ==========================================
@@ -351,6 +372,8 @@ export default function App() {
             onHabilitarAsistencia={handleHabilitarAsistencia}
             onCerrarAsistencia={handleCerrarAsistencia}
             onSaveGrades={handleSaveGrades}
+            onVolverPrincipal={() => setActiveMainTab('MAIN')}
+            onLogoutToMain={() => setActiveMainTab('MAIN')}
           />
         )}
       </main>

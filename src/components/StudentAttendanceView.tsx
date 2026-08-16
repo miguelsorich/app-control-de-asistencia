@@ -30,7 +30,9 @@ interface StudentAttendanceViewProps {
   sesionesHabilitacion: Record<string, SesionHabilitacion>;
   notas: NotaEstudiante[];
   onRegistrarAsistencia: (registro: RegistroAsistencia) => void;
-  onVolverDocente: () => void;
+  onVolverDocente?: () => void;
+  onVolverPrincipal?: () => void;
+  onLogoutToMain?: () => void;
 }
 
 type StudentSubView = 'DASHBOARD' | 'ASISTENCIAS' | 'NOTAS' | 'MARCAR';
@@ -43,13 +45,15 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
   notas,
   onRegistrarAsistencia,
   onVolverDocente,
+  onVolverPrincipal,
+  onLogoutToMain,
 }) => {
   // ==========================================
   // MÓDULO 8: ESTADO DE ACCESO / AUTENTICACIÓN
+  // Acceso directo por Registro Universitario
   // ==========================================
   const [authRU, setAuthRU] = useState<string | null>(null);
-  const [usuarioInput, setUsuarioInput] = useState('');
-  const [contrasenaInput, setContrasenaInput] = useState('');
+  const [ruInput, setRuInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Portal Navigation State
@@ -170,36 +174,31 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
   // HANDLERS
   // ==========================================
 
-  // Handle student login (Módulo 8)
+  // Handle student login (Módulo 8: Acceso directo por Registro Universitario)
   const handleStudentLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
-    const cleanUser = usuarioInput.trim();
-    const cleanPass = contrasenaInput.trim();
+    const cleanRU = ruInput.trim();
 
-    if (!cleanUser || !cleanPass) {
-      setLoginError('Usuario o contraseña incorrectos.');
+    if (!cleanRU) {
+      setLoginError('Registro Universitario no encontrado.');
       return;
     }
 
-    // Check if user matches an existing student's RU
+    // Check if the RU exists exactly in at least one imported student list
     const found = estudiantes.find(
-      (est) => est.registroUniversitario.trim().toLowerCase() === cleanUser.toLowerCase()
+      (est) => est.registroUniversitario.trim().toLowerCase() === cleanRU.toLowerCase()
     );
 
-    // Validate credentials:
-    // Usuario = Registro Universitario
-    // Contraseña inicial = Registro Universitario
-    if (!found || cleanPass.toLowerCase() !== cleanUser.toLowerCase()) {
-      setLoginError('Usuario o contraseña incorrectos.');
+    if (!found) {
+      setLoginError('Registro Universitario no encontrado.');
       return;
     }
 
-    // Login successful: Save authenticated RU and initialize state
+    // Direct access allowed: Save authenticated RU and initialize portal
     setAuthRU(found.registroUniversitario);
-    setUsuarioInput('');
-    setContrasenaInput('');
+    setRuInput('');
     setLoginError(null);
     setActiveSubView('DASHBOARD');
     setLastConfirmedRecord(null);
@@ -210,12 +209,14 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
   const handleLogout = () => {
     setAuthRU(null);
     setSelectedSubjectId(null);
-    setUsuarioInput('');
-    setContrasenaInput('');
+    setRuInput('');
     setLoginError(null);
     setActiveSubView('DASHBOARD');
     setLastConfirmedRecord(null);
     setMarkErrorMessage(null);
+    if (onLogoutToMain) {
+      onLogoutToMain();
+    }
   };
 
   // Handle marking attendance
@@ -300,46 +301,26 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
             </p>
           </div>
 
-          {/* Formulario de Acceso */}
+          {/* Formulario de Acceso Simplificado (Solo Registro Universitario) */}
           <form onSubmit={handleStudentLogin} className="space-y-4">
             <div>
               <label
-                htmlFor="input-student-usuario"
+                htmlFor="input-student-ru"
                 className="block text-xs font-bold text-[#172033] mb-1.5 uppercase tracking-wider"
               >
-                Usuario
+                Registro Universitario
               </label>
               <input
-                id="input-student-usuario"
+                id="input-student-ru"
                 type="text"
                 autoFocus
-                value={usuarioInput}
+                value={ruInput}
                 onChange={(e) => {
-                  setUsuarioInput(e.target.value);
+                  setRuInput(e.target.value);
                   if (loginError) setLoginError(null);
                 }}
-                placeholder="Registro Universitario"
+                placeholder="Ingresa tu Registro Universitario"
                 className="w-full px-4 py-2.5 text-sm font-mono font-medium rounded-xl border border-[#DCE3EC] focus:outline-none focus:ring-2 focus:ring-[#174EAF] focus:border-[#174EAF] bg-white text-[#172033] placeholder:font-sans placeholder:text-[#667085]"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="input-student-contrasena"
-                className="block text-xs font-bold text-[#172033] mb-1.5 uppercase tracking-wider"
-              >
-                Contraseña
-              </label>
-              <input
-                id="input-student-contrasena"
-                type="password"
-                value={contrasenaInput}
-                onChange={(e) => {
-                  setContrasenaInput(e.target.value);
-                  if (loginError) setLoginError(null);
-                }}
-                placeholder="Contraseña"
-                className="w-full px-4 py-2.5 text-sm rounded-xl border border-[#DCE3EC] focus:outline-none focus:ring-2 focus:ring-[#174EAF] focus:border-[#174EAF] bg-white text-[#172033] placeholder:text-[#667085]"
               />
             </div>
 
@@ -364,16 +345,16 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
             </button>
           </form>
 
-          {/* Volver a panel docente (facilitar cambio en desarrollo/vista general) */}
+          {/* Volver a la pantalla principal de acceso */}
           <div className="pt-2 border-t border-[#DCE3EC] text-center">
             <button
-              id="btn-student-volver-docente"
+              id="btn-student-volver-principal"
               type="button"
-              onClick={onVolverDocente}
-              className="text-xs font-semibold text-[#174EAF] hover:text-[#103B88] transition-colors cursor-pointer inline-flex items-center gap-1"
+              onClick={onVolverPrincipal || onVolverDocente}
+              className="text-xs font-semibold text-[#174EAF] hover:text-[#103B88] transition-colors cursor-pointer inline-flex items-center gap-1.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Volver a Panel Docente</span>
+              <span>Volver a la pantalla principal</span>
             </button>
           </div>
         </div>
@@ -433,6 +414,9 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
             <span className="bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC] text-xs font-bold px-2 py-0.5 rounded">
               Grupo {selectedSubject.grupo}
             </span>
+            <span className="bg-[#F5F7FA] text-[#172033] border border-[#DCE3EC] text-xs font-semibold px-2 py-0.5 rounded">
+              Semestre {selectedSubject.semestre || 1} · {selectedSubject.año || 2026}
+            </span>
           </div>
 
           <h2 className="text-lg sm:text-xl font-black text-[#172033] truncate">
@@ -472,7 +456,7 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
               >
                 {enrolledSubjects.map((asig) => (
                   <option key={asig.id} value={asig.id}>
-                    {asig.sigla} - {asig.nombre} (Gr. {asig.grupo})
+                    {asig.sigla} - {asig.nombre} (Gr. {asig.grupo} · Sem. {asig.semestre || 1}/{asig.año || 2026})
                   </option>
                 ))}
               </select>

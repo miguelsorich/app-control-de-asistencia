@@ -262,12 +262,15 @@ export const AttendanceEnablementManager: React.FC<AttendanceEnablementManagerPr
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-mono font-bold text-xs bg-[#174EAF] text-white px-2 py-0.5 rounded-lg">
                           {asig.sigla}
                         </span>
                         <span className="text-[11px] font-semibold text-[#172033] bg-[#E8F0FC] px-1.5 py-0.5 rounded border border-[#DCE3EC]">
                           G{asig.grupo}
+                        </span>
+                        <span className="text-[10px] font-medium text-[#667085] bg-[#F5F7FA] px-1.5 py-0.5 rounded border border-[#DCE3EC]">
+                          Sem. {asig.semestre || 1}/{asig.año || 2026}
                         </span>
                       </div>
                       <h4 className="text-xs font-bold text-[#172033] mt-1 line-clamp-1">
@@ -314,6 +317,9 @@ export const AttendanceEnablementManager: React.FC<AttendanceEnablementManagerPr
                     </span>
                     <span className="bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC] text-xs font-bold px-2 py-0.5 rounded-lg">
                       Grupo {selectedSubject.grupo}
+                    </span>
+                    <span className="bg-[#F5F7FA] text-[#172033] border border-[#DCE3EC] text-xs font-semibold px-2 py-0.5 rounded-lg">
+                      Semestre {selectedSubject.semestre || 1} · {selectedSubject.año || 2026}
                     </span>
                     {selectedSubject.aula && (
                       <span className="text-xs text-[#667085] bg-[#F5F7FA] px-2 py-0.5 rounded-lg border border-[#DCE3EC]">

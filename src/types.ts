@@ -40,11 +40,15 @@ export const MODALIDADES: Record<ModalidadSemanal, ModalidadConfig> = {
   },
 };
 
+export type SemestreAsignatura = 1 | 2;
+
 export interface Asignatura {
   id: string;
   nombre: string;
   sigla: string;
   grupo: string;
+  semestre: SemestreAsignatura;
+  año: number;
   modalidad: ModalidadSemanal;
   horaInicio: string; // HH:MM
   horaFin: string; // HH:MM

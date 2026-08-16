@@ -79,6 +79,9 @@ export const SubjectStudentsView: React.FC<SubjectStudentsViewProps> = ({
               <span className="bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC] text-xs font-bold px-2.5 py-1 rounded-lg">
                 Grupo {asignatura.grupo}
               </span>
+              <span className="bg-[#F5F7FA] text-[#172033] border border-[#DCE3EC] text-xs font-semibold px-2.5 py-1 rounded-lg">
+                Semestre {asignatura.semestre || 1} · {asignatura.año || 2026}
+              </span>
               {asignatura.aula && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-[#667085] bg-[#F5F7FA] border border-[#DCE3EC]">
                   <MapPin className="w-3.5 h-3.5 text-[#667085]" />

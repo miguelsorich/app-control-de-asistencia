@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Asignatura, ModalidadSemanal } from '../types';
+import { Asignatura, ModalidadSemanal, SemestreAsignatura } from '../types';
 import {
   calculateEndTime,
   COMMON_TIME_SLOTS_LUN_MIE_VIE,
   COMMON_TIME_SLOTS_MAR_JUE,
   COMMON_TIME_SLOTS_SABADO,
 } from '../utils/timeHelpers';
-import { X, Calendar, Clock, BookOpen, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Calendar, Clock, BookOpen, CheckCircle2, AlertCircle, CalendarDays } from 'lucide-react';
 
 interface SubjectFormModalProps {
   isOpen: boolean;
@@ -24,6 +24,8 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   const [nombre, setNombre] = useState('');
   const [sigla, setSigla] = useState('');
   const [grupo, setGrupo] = useState('');
+  const [semestre, setSemestre] = useState<SemestreAsignatura>(1);
+  const [año, setAño] = useState<number>(2026);
   const [modalidad, setModalidad] = useState<ModalidadSemanal>('LUN_MIE_VIE');
   const [horaInicio, setHoraInicio] = useState('07:00');
   const [horaFin, setHoraFin] = useState('08:30');
@@ -38,6 +40,8 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         setNombre(initialData.nombre);
         setSigla(initialData.sigla);
         setGrupo(initialData.grupo);
+        setSemestre(initialData.semestre || 1);
+        setAño(initialData.año || 2026);
         setModalidad(initialData.modalidad);
         setHoraInicio(initialData.horaInicio);
         setHoraFin(initialData.horaFin);
@@ -47,6 +51,8 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         setNombre('');
         setSigla('');
         setGrupo('');
+        setSemestre(1);
+        setAño(new Date().getFullYear() >= 2026 ? new Date().getFullYear() : 2026);
         setModalidad('LUN_MIE_VIE');
         setHoraInicio('07:00');
         setHoraFin('08:30');
@@ -99,6 +105,13 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
     if (!grupo.trim()) {
       newErrors.grupo = 'El grupo es obligatorio (ej. SA, SB, Z1).';
     }
+    if (semestre !== 1 && semestre !== 2) {
+      newErrors.semestre = 'El semestre debe ser 1 o 2.';
+    }
+    const numAño = Number(año);
+    if (!numAño || isNaN(numAño) || numAño < 2000 || numAño > 2100 || String(numAño).length !== 4) {
+      newErrors.año = 'Debe indicar un año válido de 4 dígitos (ej. 2026, 2027, 2028).';
+    }
     if (!horaInicio) {
       newErrors.horaInicio = 'Debe indicar la hora de inicio.';
     }
@@ -119,6 +132,8 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
       nombre: nombre.trim(),
       sigla: sigla.trim().toUpperCase(),
       grupo: grupo.trim().toUpperCase(),
+      semestre: Number(semestre) === 2 ? 2 : 1,
+      año: Number(año),
       modalidad,
       horaInicio,
       horaFin,
@@ -264,6 +279,82 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
                 <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
                   <AlertCircle className="w-3.5 h-3.5" />
                   {errors.grupo}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Semestre y Año Académico (Nuevos campos obligatorios) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#F5F7FA] p-3.5 rounded-xl border border-[#DCE3EC]">
+            <div>
+              <label
+                htmlFor="select-semestre"
+                className="block text-xs font-bold text-[#172033] uppercase tracking-wider mb-1.5"
+              >
+                Semestre <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  id="btn-semestre-1"
+                  onClick={() => setSemestre(1)}
+                  className={`py-2 px-3 text-xs font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                    semestre === 1
+                      ? 'bg-[#174EAF] text-white border-[#174EAF] shadow-xs'
+                      : 'bg-white text-[#172033] border-[#DCE3EC] hover:border-[#174EAF]'
+                  }`}
+                >
+                  Semestre 1
+                </button>
+                <button
+                  type="button"
+                  id="btn-semestre-2"
+                  onClick={() => setSemestre(2)}
+                  className={`py-2 px-3 text-xs font-bold rounded-lg border transition-all cursor-pointer text-center ${
+                    semestre === 2
+                      ? 'bg-[#174EAF] text-white border-[#174EAF] shadow-xs'
+                      : 'bg-white text-[#172033] border-[#DCE3EC] hover:border-[#174EAF]'
+                  }`}
+                >
+                  Semestre 2
+                </button>
+              </div>
+              {errors.semestre && (
+                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  {errors.semestre}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label
+                htmlFor="input-anio"
+                className="block text-xs font-bold text-[#172033] uppercase tracking-wider mb-1.5"
+              >
+                Año <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  id="input-anio"
+                  type="number"
+                  min="2000"
+                  max="2100"
+                  step="1"
+                  value={año}
+                  onChange={(e) => setAño(parseInt(e.target.value, 10) || 0)}
+                  placeholder="Ej. 2026, 2027"
+                  className={`w-full px-3.5 py-2 text-sm rounded-xl border ${
+                    errors.año
+                      ? 'border-red-400 focus:ring-red-400 focus:border-red-500 bg-red-50/20'
+                      : 'border-[#DCE3EC] focus:ring-[#174EAF] focus:border-[#174EAF]'
+                  } focus:outline-none focus:ring-2 transition-all font-mono font-medium bg-white`}
+                />
+              </div>
+              {errors.año && (
+                <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5" />
+                  {errors.año}
                 </p>
               )}
             </div>
