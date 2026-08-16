@@ -1,0 +1,6 @@
+{
+  "name": "Control de Asistencia UAGRM",
+  "description": "Sistema de control de asistencia universitaria UAGRM con gestión de asignaturas, importación de estudiantes, registro, habilitación, reportes, notas, correos, acceso de estudiantes y portal docente/administrador (Módulos 1 al 9).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
