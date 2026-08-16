@@ -469,7 +469,7 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
           {/* Tarjeta del Docente Responsable (Fotografía Oficial) */}
           <div className="flex items-center gap-3 bg-[#F5F7FA] border border-[#DCE3EC] rounded-xl p-2.5 sm:p-3">
             <img
-              src="/docente_miguel.jpeg"
+              src="/docente_miguel.png"
               alt="Docente Miguel Antonio Sorich Rojas"
               className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl object-cover border border-[#174EAF]/30 shadow-2xs flex-shrink-0"
               referrerPolicy="no-referrer"

@@ -294,7 +294,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         {/* Profile photo and Teacher Identification */}
         <div className="flex items-center gap-4">
           <img
-            src="/docente_miguel.jpeg"
+            src="/docente_miguel.png"
             alt="Docente Miguel Antonio Sorich Rojas"
             className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-[#174EAF]/30 shadow-xs flex-shrink-0"
             referrerPolicy="no-referrer"

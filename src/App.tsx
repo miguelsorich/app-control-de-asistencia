@@ -268,7 +268,7 @@ export default function App() {
       if (updatedItem) {
         saveAsignaturaToSupabase(updatedItem);
       }
-      showToast(`Asignatura "${data.sigla} - ${data.nombre}" sincronizada con Supabase.`);
+      showToast(`Asignatura "${data.sigla} - ${data.nombre}" guardada correctamente.`);
     } else {
       const newId = `asig-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
       const newSubject: Asignatura = {
@@ -278,7 +278,7 @@ export default function App() {
       };
       setAsignaturas((prev) => [newSubject, ...prev]);
       saveAsignaturaToSupabase(newSubject);
-      showToast(`Asignatura "${data.sigla} - ${data.nombre}" creada y guardada en Supabase.`);
+      showToast(`Asignatura "${data.sigla} - ${data.nombre}" agregada correctamente.`);
     }
   };
 
@@ -300,7 +300,7 @@ export default function App() {
       return copy;
     });
     deleteAsignaturaFromSupabase(targetId);
-    showToast(`Asignatura "${deleteTarget.nombre}" eliminada de Supabase.`);
+    showToast(`Asignatura "${deleteTarget.nombre}" eliminada.`);
     setDeleteTarget(null);
   };
 
@@ -315,9 +315,9 @@ export default function App() {
       setEstudiantes((prev) => [...prev, ...newStudents]);
       saveEstudiantesBatchToSupabase(newStudents);
       showToast(
-        `Se sincronizaron ${newStudents.length} estudiante${
+        `Se agregaron ${newStudents.length} estudiante${
           newStudents.length === 1 ? '' : 's'
-        } en Supabase.`
+        } a la asignatura.`
       );
     }
   };
@@ -393,7 +393,7 @@ export default function App() {
   const handleSaveGrades = (updatedGrades: NotaEstudiante[]) => {
     setNotas(updatedGrades);
     saveNotasBatchToSupabase(updatedGrades);
-    showToast('Notas sincronizadas con Supabase.');
+    showToast('Notas de la asignatura actualizadas correctamente.');
   };
 
   return (
@@ -405,8 +405,6 @@ export default function App() {
         activeTab={activeMainTab}
         onChangeTab={(tab) => setActiveMainTab(tab)}
         onNavigateHome={() => setActiveMainTab('MAIN')}
-        onManualSync={loadAllDataFromSupabase}
-        isSyncing={isSyncing}
       />
 
       {/* Main Content Area */}
