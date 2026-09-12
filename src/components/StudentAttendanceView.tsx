@@ -21,6 +21,7 @@ import {
   LogOut,
   ChevronRight,
   BookOpen,
+  UserCheck,
 } from 'lucide-react';
 
 interface StudentAttendanceViewProps {
@@ -289,15 +290,19 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
           </div>
 
           {/* Title */}
-          <div className="text-center space-y-1.5">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#172033] tracking-tight">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC]">
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Portal Oficial del Estudiante</span>
+            </div>
+            <h1 className="text-xl sm:text-2xl font-black text-[#172033] tracking-tight">
               Acceso de Estudiantes
             </h1>
             <p className="text-xs font-semibold text-[#174EAF]">
-              Sistema de Control de Asistencia — UAGRM
+              Control de Asistencia Presencial — UAGRM
             </p>
             <p className="text-[11px] text-[#667085]">
-              Docente: <strong>Miguel Antonio Sorich Rojas</strong> (Código: 6379)
+              Docente: <strong>Miguel Antonio Sorich Rojas</strong> (Cód. 6379)
             </p>
           </div>
 
@@ -308,7 +313,7 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
                 htmlFor="input-student-ru"
                 className="block text-xs font-bold text-[#172033] mb-1.5 uppercase tracking-wider"
               >
-                Registro Universitario
+                Registro Universitario (R.U.)
               </label>
               <input
                 id="input-student-ru"
@@ -319,9 +324,12 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
                   setRuInput(e.target.value);
                   if (loginError) setLoginError(null);
                 }}
-                placeholder="Ingresa tu Registro Universitario"
-                className="w-full px-4 py-2.5 text-sm font-mono font-medium rounded-xl border border-[#DCE3EC] focus:outline-none focus:ring-2 focus:ring-[#174EAF] focus:border-[#174EAF] bg-white text-[#172033] placeholder:font-sans placeholder:text-[#667085]"
+                placeholder="Ej. 220012345"
+                className="w-full px-4 py-3 text-sm font-mono font-medium rounded-xl border border-[#DCE3EC] focus:outline-none focus:ring-2 focus:ring-[#174EAF] focus:border-[#174EAF] bg-white text-[#172033] placeholder:font-sans placeholder:text-[#667085] shadow-2xs"
               />
+              <p className="text-[11px] text-[#667085] mt-1.5">
+                Ingresa tu número de registro oficial para acceder a tus materias.
+              </p>
             </div>
 
             {/* Error banner */}
@@ -340,22 +348,17 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
               type="submit"
               className="w-full py-3 px-4 bg-[#174EAF] hover:bg-[#103B88] text-white font-bold text-sm rounded-xl shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#174EAF] focus:ring-offset-2 cursor-pointer flex items-center justify-center gap-2"
             >
-              <span>Ingresar</span>
+              <span>Ingresar al Portal</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </form>
 
-          {/* Volver a la pantalla principal de acceso */}
-          <div className="pt-2 border-t border-[#DCE3EC] text-center">
-            <button
-              id="btn-student-volver-principal"
-              type="button"
-              onClick={onVolverPrincipal || onVolverDocente}
-              className="text-xs font-semibold text-[#174EAF] hover:text-[#103B88] transition-colors cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Volver a la pantalla principal</span>
-            </button>
+          {/* Academic Footer Reassurance */}
+          <div className="pt-3 border-t border-[#DCE3EC] text-center space-y-1">
+            <p className="text-[11px] text-[#667085] flex items-center justify-center gap-1.5 font-medium">
+              <GraduationCap className="w-3.5 h-3.5 text-[#174EAF]" />
+              <span>Facultad de Ciencias Contables UAGRM • Gestión 2026</span>
+            </p>
           </div>
         </div>
       </div>

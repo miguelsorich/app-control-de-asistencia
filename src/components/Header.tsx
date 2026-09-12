@@ -1,5 +1,5 @@
-import React from 'react';
-import { UserCheck, LayoutGrid, Home } from 'lucide-react';
+import React, { useRef } from 'react';
+import { UserCheck, ShieldCheck, ArrowLeft } from 'lucide-react';
 
 interface HeaderProps {
   onOpenAddModal?: () => void;
@@ -9,22 +9,47 @@ interface HeaderProps {
   onChangeTab: (tab: 'MAIN' | 'DOCENTE' | 'ESTUDIANTE') => void;
   activeSubjectName?: string | null;
   onNavigateHome?: () => void;
+  onUnlockDocente?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onChangeTab,
-  onNavigateHome,
+  onUnlockDocente,
 }) => {
+  const clickCountRef = useRef<number>(0);
+  const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Manejador secreto de 3 clics para acceder al portal docente / administrador
+  const handleSecretTripleClick = () => {
+    clickCountRef.current += 1;
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+    }
+
+    if (clickCountRef.current >= 3) {
+      clickCountRef.current = 0;
+      if (onUnlockDocente) {
+        onUnlockDocente();
+      } else {
+        onChangeTab('DOCENTE');
+      }
+    } else {
+      clickTimerRef.current = setTimeout(() => {
+        clickCountRef.current = 0;
+      }, 2000);
+    }
+  };
+
   return (
     <header id="header-uagrm" className="bg-[#174EAF] text-white border-b border-[#103B88] shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-3.5">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3.5 sm:gap-4">
-          {/* Logos & Title Container */}
+          {/* Logos & Title Container - Zona con detector secreto de 3 clics */}
           <div
-            onClick={onNavigateHome || (() => onChangeTab('MAIN'))}
-            className="flex items-center gap-3 sm:gap-4 cursor-pointer group"
-            title="Ir a la pantalla principal de acceso"
+            onClick={handleSecretTripleClick}
+            className="flex items-center gap-3 sm:gap-4 cursor-pointer select-none group"
+            title="Control de Asistencia UAGRM"
           >
             {/* Logos Group */}
             <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0 bg-white/95 p-1.5 sm:p-2 rounded-xl shadow-xs border border-white/20 group-hover:bg-white transition-colors">
@@ -62,57 +87,39 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation Switcher */}
+          {/* Navigation Area: Para los estudiantes solo se muestra la identidad del Portal Estudiante */}
           <div className="flex items-center gap-2 sm:gap-3 self-start lg:self-auto flex-wrap">
-            <div className="bg-[#103B88] p-1 rounded-xl border border-white/15 flex items-center gap-1">
-              <button
-                id="tab-nav-inicio"
-                type="button"
-                onClick={() => onChangeTab('MAIN')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'MAIN'
-                    ? 'bg-white text-[#174EAF] shadow-xs'
-                    : 'text-white/90 hover:text-white hover:bg-white/10'
-                }`}
-                title="Pantalla principal de acceso"
-              >
-                <Home className="w-3.5 h-3.5" />
-                <span>Inicio</span>
-              </button>
-
-              <button
-                id="tab-nav-estudiante"
-                type="button"
-                onClick={() => onChangeTab('ESTUDIANTE')}
-                className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'ESTUDIANTE'
-                    ? 'bg-white text-[#174EAF] shadow-xs'
-                    : 'text-white/90 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <UserCheck className="w-3.5 h-3.5" />
+            {activeTab === 'DOCENTE' ? (
+              /* Modo Docente / Administrador activo (Desbloqueado tras los 3 clics) */
+              <div className="flex items-center gap-2">
+                <div className="bg-[#103B88] px-3 py-1.5 rounded-xl border border-amber-300/40 flex items-center gap-2 text-xs font-bold text-amber-200">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
+                  <span className="hidden sm:inline">Panel</span> Docente / Admin
+                </div>
+                <button
+                  id="btn-nav-volver-estudiante"
+                  type="button"
+                  onClick={() => onChangeTab('ESTUDIANTE')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-[#174EAF] hover:bg-blue-50 transition-all shadow-xs cursor-pointer"
+                  title="Volver a la vista del estudiante"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Volver a Vista Estudiante</span>
+                </button>
+              </div>
+            ) : (
+              /* Vista oficial del Estudiante: Limpia, sin enlaces ni pestañas del portal docente */
+              <div className="bg-[#103B88] px-3.5 py-1.5 sm:py-2 rounded-xl border border-white/20 flex items-center gap-2 text-xs font-bold text-white shadow-2xs">
+                <UserCheck className="w-4 h-4 text-blue-200" />
                 <span>Portal Estudiante</span>
-              </button>
-
-              <button
-                id="tab-nav-docente"
-                type="button"
-                onClick={() => onChangeTab('DOCENTE')}
-                className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  activeTab === 'DOCENTE'
-                    ? 'bg-white text-[#174EAF] shadow-xs'
-                    : 'text-white/90 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Portal Docente</span>
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
     </header>
   );
 };
+
 
 

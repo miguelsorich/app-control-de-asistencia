@@ -266,7 +266,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
             </button>
           </form>
 
-          {/* Volver a la pantalla principal de acceso */}
+          {/* Volver a la vista del estudiante */}
           {onVolverPrincipal && (
             <div className="pt-2 border-t border-[#DCE3EC] text-center">
               <button
@@ -276,7 +276,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 className="text-xs font-semibold text-[#174EAF] hover:text-[#103B88] transition-colors cursor-pointer inline-flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Volver a la pantalla principal</span>
+                <span>Volver a la vista del estudiante</span>
               </button>
             </div>
           )}

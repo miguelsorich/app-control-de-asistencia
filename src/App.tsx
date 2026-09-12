@@ -43,9 +43,37 @@ const STORAGE_KEY_GRADES = 'uagrm_asistencia_notas_v1';
 const STORAGE_KEY_EMAIL_LOGS = 'uagrm_asistencia_correos_v1';
 
 export default function App() {
-  // Primary Navigation State (Módulo 10: Pantalla principal de acceso)
-  const [activeMainTab, setActiveMainTab] = useState<'MAIN' | 'DOCENTE' | 'ESTUDIANTE'>('MAIN');
+  // Primary Navigation State (Por defecto inicia en el Portal Estudiante para que los alumnos solo vean su módulo)
+  const [activeMainTab, setActiveMainTab] = useState<'MAIN' | 'DOCENTE' | 'ESTUDIANTE'>('ESTUDIANTE');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Referencias para el activador secreto de 3 clics en el pie de página
+  const footerClickCountRef = React.useRef<number>(0);
+  const footerClickTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Activación del modo docente / administrador (tras 3 clics)
+  const handleUnlockDocente = useCallback(() => {
+    setActiveMainTab('DOCENTE');
+    setToastMessage('Acceso Docente / Administrador habilitado');
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === 'Acceso Docente / Administrador habilitado' ? null : prev));
+    }, 3000);
+  }, []);
+
+  const handleSecretFooterClick = () => {
+    footerClickCountRef.current += 1;
+    if (footerClickTimerRef.current) {
+      clearTimeout(footerClickTimerRef.current);
+    }
+    if (footerClickCountRef.current >= 3) {
+      footerClickCountRef.current = 0;
+      handleUnlockDocente();
+    } else {
+      footerClickTimerRef.current = setTimeout(() => {
+        footerClickCountRef.current = 0;
+      }, 2000);
+    }
+  };
 
   // Subjects State (Módulo 1)
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>(() => {
@@ -404,47 +432,17 @@ export default function App() {
         totalEstudiantes={estudiantes.length}
         activeTab={activeMainTab}
         onChangeTab={(tab) => setActiveMainTab(tab)}
-        onNavigateHome={() => setActiveMainTab('MAIN')}
+        onNavigateHome={() => setActiveMainTab('ESTUDIANTE')}
+        onUnlockDocente={handleUnlockDocente}
       />
 
-      {/* Main Content Area */}
+      {/* Main Content Area: El estudiante solo ve el Portal Estudiante directamente */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {activeMainTab === 'MAIN' ? (
-          /* ==========================================
-             MÓDULO 10: PANTALLA PRINCIPAL DE ACCESO
-             Punto de entrada inicial del sistema
-             ========================================== */
-          <MainAccessScreen
-            onSelectEstudiante={() => setActiveMainTab('ESTUDIANTE')}
-            onSelectDocente={() => setActiveMainTab('DOCENTE')}
-            totalAsignaturas={asignaturas.length}
-            totalEstudiantes={estudiantes.length}
-          />
-        ) : activeMainTab === 'ESTUDIANTE' ? (
-          /* ==========================================
-             PORTAL DEL ESTUDIANTE (MÓDULOS 3, 6 Y 8)
-             ========================================== */
-          <StudentAttendanceView
-            asignaturas={asignaturas}
-            estudiantes={estudiantes}
-            registrosAsistencia={registrosAsistencia}
-            sesionesHabilitacion={sesionesHabilitacion}
-            notas={notas}
-            onRegistrarAsistencia={handleRegistrarAsistencia}
-            onVolverPrincipal={() => setActiveMainTab('MAIN')}
-            onVolverDocente={() => setActiveMainTab('DOCENTE')}
-            onLogoutToMain={() => setActiveMainTab('MAIN')}
-          />
-        ) : (
+        {activeMainTab === 'DOCENTE' ? (
           /* ==========================================
              PORTAL DOCENTE / ADMINISTRADOR (MÓDULO 9)
              Acceso Docente: Miguel Antonio Sorich Rojas (6379)
-             Centraliza:
-             1. Gestión de asignaturas
-             2. Estudiantes
-             3. Habilitar asistencia
-             4. Reportes de asistencia
-             5. Importación de notas
+             Solo accesible mediante 3 clics en el logo del encabezado o en el pie de página
              ========================================== */
           <TeacherPortalView
             asignaturas={asignaturas}
@@ -460,13 +458,29 @@ export default function App() {
             onHabilitarAsistencia={handleHabilitarAsistencia}
             onCerrarAsistencia={handleCerrarAsistencia}
             onSaveGrades={handleSaveGrades}
-            onVolverPrincipal={() => setActiveMainTab('MAIN')}
-            onLogoutToMain={() => setActiveMainTab('MAIN')}
+            onVolverPrincipal={() => setActiveMainTab('ESTUDIANTE')}
+            onLogoutToMain={() => setActiveMainTab('ESTUDIANTE')}
+          />
+        ) : (
+          /* ==========================================
+             PORTAL DEL ESTUDIANTE (MÓDULOS 3, 6 Y 8)
+             Vista principal y única visible para los estudiantes
+             ========================================== */
+          <StudentAttendanceView
+            asignaturas={asignaturas}
+            estudiantes={estudiantes}
+            registrosAsistencia={registrosAsistencia}
+            sesionesHabilitacion={sesionesHabilitacion}
+            notas={notas}
+            onRegistrarAsistencia={handleRegistrarAsistencia}
+            onVolverPrincipal={() => setActiveMainTab('ESTUDIANTE')}
+            onVolverDocente={() => setActiveMainTab('ESTUDIANTE')}
+            onLogoutToMain={() => setActiveMainTab('ESTUDIANTE')}
           />
         )}
       </main>
 
-      {/* Footer */}
+      {/* Footer con zona secundaria de 3 clics para el administrador */}
       <footer className="bg-white border-t border-[#DCE3EC] py-4 mt-12 text-center text-xs text-[#667085]">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-[#172033] font-medium">
@@ -487,7 +501,11 @@ export default function App() {
             </div>
             <span>Control de Asistencia UAGRM — Digital Academy</span>
           </div>
-          <p className="text-[#667085] text-[11px]">
+          <p
+            onClick={handleSecretFooterClick}
+            className="text-[#667085] text-[11px] select-none cursor-default"
+            title="Facultad de Ciencias Contables UAGRM"
+          >
             Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas • Docente: Miguel Antonio Sorich Rojas (Cód. 6379)
           </p>
         </div>
