@@ -16,7 +16,7 @@ import { SubjectFormModal } from './components/SubjectFormModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { ImportStudentsModal } from './components/ImportStudentsModal';
 import { StudentAttendanceView } from './components/StudentAttendanceView';
-import { TeacherPortalView } from './components/TeacherPortalView';
+import { TeacherPortalView, DocenteSection } from './components/TeacherPortalView';
 import { MainAccessScreen } from './components/MainAccessScreen';
 import { getTodayDateString, formatCurrentTimeWithSeconds } from './utils/scheduleValidators';
 import {
@@ -27,6 +27,7 @@ import {
   saveEstudiantesBatchToSupabase,
   fetchAsistenciasFromSupabase,
   saveAsistenciaToSupabase,
+  saveAsistenciasBatchToSupabase,
   fetchSesionesFromSupabase,
   saveSesionToSupabase,
   fetchNotasFromSupabase,
@@ -45,6 +46,7 @@ const STORAGE_KEY_EMAIL_LOGS = 'uagrm_asistencia_correos_v1';
 export default function App() {
   // Primary Navigation State (Por defecto inicia en el Portal Estudiante para que los alumnos solo vean su módulo)
   const [activeMainTab, setActiveMainTab] = useState<'MAIN' | 'DOCENTE' | 'ESTUDIANTE'>('ESTUDIANTE');
+  const [activeTeacherSection, setActiveTeacherSection] = useState<DocenteSection>('DASHBOARD');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Referencias para el activador secreto de 3 clics en el pie de página
@@ -57,6 +59,16 @@ export default function App() {
     setToastMessage('Acceso Docente / Administrador habilitado');
     setTimeout(() => {
       setToastMessage((prev) => (prev === 'Acceso Docente / Administrador habilitado' ? null : prev));
+    }, 3000);
+  }, []);
+
+  // Apertura directa a la pestaña de Gráficos & Rendimiento con Recharts
+  const handleOpenDocenteGraficos = useCallback(() => {
+    setActiveTeacherSection('GRAFICOS');
+    setActiveMainTab('DOCENTE');
+    setToastMessage('Visualizando Resumen de Rendimiento con Recharts');
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === 'Visualizando Resumen de Rendimiento con Recharts' ? null : prev));
     }, 3000);
   }, []);
 
@@ -191,7 +203,29 @@ export default function App() {
       }
 
       if (remoteAsis && remoteAsis.length > 0) {
-        setRegistrosAsistencia(remoteAsis);
+        setRegistrosAsistencia((prevLocal) => {
+          // Fusionar registros remotos (con paginación completa) y registros locales sin perder ningún registro
+          const map = new Map<string, RegistroAsistencia>();
+          remoteAsis.forEach((r) => map.set(r.id, r));
+          const unsynced: RegistroAsistencia[] = [];
+          prevLocal.forEach((r) => {
+            if (!map.has(r.id)) {
+              map.set(r.id, r);
+              unsynced.push(r);
+            }
+          });
+          if (unsynced.length > 0) {
+            saveAsistenciasBatchToSupabase(unsynced);
+          }
+          return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        });
+      } else {
+        setRegistrosAsistencia((prevLocal) => {
+          if (prevLocal.length > 0) {
+            saveAsistenciasBatchToSupabase(prevLocal);
+          }
+          return prevLocal;
+        });
       }
 
       if (remoteSes && Object.keys(remoteSes).length > 0) {
@@ -213,6 +247,116 @@ export default function App() {
   useEffect(() => {
     loadAllDataFromSupabase();
   }, [loadAllDataFromSupabase]);
+
+  // Sincronización en tiempo real y periódica (Live Sync para habilitación y marcaciones en vivo)
+  useEffect(() => {
+    // 1. Canal Realtime de Supabase para eventos inmediatos
+    const channel = supabase
+      .channel('live-asistencia-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sesiones_habilitacion' },
+        (payload) => {
+          if (payload.new) {
+            const row: any = payload.new;
+            const updatedSesion: SesionHabilitacion = {
+              id: row.id,
+              asignaturaId: row.asignatura_id,
+              fecha: row.fecha,
+              horaInicioHabilitacion: row.hora_inicio_habilitacion,
+              duracionMinutos: Number(row.duracion_minutos),
+              creadoTimestamp: Number(row.creado_timestamp),
+              expiraTimestamp: Number(row.expira_timestamp),
+              activa: Boolean(row.activa),
+              cerradoManualmente: Boolean(row.cerrado_manualmente),
+            };
+            setSesionesHabilitacion((prev) => {
+              const current = prev[updatedSesion.asignaturaId];
+              if (!current || updatedSesion.creadoTimestamp >= current.creadoTimestamp) {
+                return {
+                  ...prev,
+                  [updatedSesion.asignaturaId]: updatedSesion,
+                };
+              }
+              return prev;
+            });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'registros_asistencia' },
+        (payload) => {
+          if (payload.new) {
+            const row: any = payload.new;
+            const newRecord: RegistroAsistencia = {
+              id: row.id,
+              asignaturaId: row.asignatura_id,
+              registroUniversitario: row.registro_universitario,
+              fecha: row.fecha,
+              horaMarcado: row.hora_marcado,
+              estado: row.estado as any,
+              timestamp: Number(row.timestamp || Date.now()),
+            };
+            setRegistrosAsistencia((prev) => {
+              if (prev.some((r) => r.id === newRecord.id)) {
+                return prev.map((r) => (r.id === newRecord.id ? newRecord : r));
+              }
+              return [newRecord, ...prev];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // 2. Intervalo de respaldo periódico cada 6 segundos para actualización automática sin recargar
+    const pollingInterval = setInterval(async () => {
+      try {
+        const [remoteSes, remoteAsis] = await Promise.all([
+          fetchSesionesFromSupabase(),
+          fetchAsistenciasFromSupabase(),
+        ]);
+
+        if (remoteSes && Object.keys(remoteSes).length > 0) {
+          setSesionesHabilitacion((prev) => {
+            const hasChanged = Object.keys(remoteSes).some((k) => {
+              const old = prev[k];
+              const cur = remoteSes[k];
+              if (!old) return true;
+              return (
+                old.id !== cur.id ||
+                old.activa !== cur.activa ||
+                old.cerradoManualmente !== cur.cerradoManualmente ||
+                old.expiraTimestamp !== cur.expiraTimestamp
+              );
+            });
+            return hasChanged ? remoteSes : prev;
+          });
+        }
+
+        if (remoteAsis && remoteAsis.length > 0) {
+          setRegistrosAsistencia((prevLocal) => {
+            if (remoteAsis.length !== prevLocal.length) {
+              const map = new Map<string, RegistroAsistencia>();
+              remoteAsis.forEach((r) => map.set(r.id, r));
+              prevLocal.forEach((r) => {
+                if (!map.has(r.id)) map.set(r.id, r);
+              });
+              return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            }
+            return prevLocal;
+          });
+        }
+      } catch (err) {
+        // Silently tolerate background poll hiccups
+      }
+    }, 6000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(pollingInterval);
+    };
+  }, []);
 
   // Save to localStorage
   useEffect(() => {
@@ -364,7 +508,20 @@ export default function App() {
 
   // Attendance Registration (Módulo 3)
   const handleRegistrarAsistencia = (nuevoRegistro: RegistroAsistencia) => {
-    setRegistrosAsistencia((prev) => [nuevoRegistro, ...prev]);
+    setRegistrosAsistencia((prev) => {
+      // Evitar duplicación en la misma fecha para el mismo estudiante y materia, conservando todas las fechas anteriores intactas
+      const filtered = prev.filter(
+        (r) =>
+          !(
+            r.id === nuevoRegistro.id ||
+            (r.asignaturaId === nuevoRegistro.asignaturaId &&
+              r.registroUniversitario.trim().toLowerCase() ===
+                nuevoRegistro.registroUniversitario.trim().toLowerCase() &&
+              r.fecha === nuevoRegistro.fecha)
+          )
+      );
+      return [nuevoRegistro, ...filtered];
+    });
     saveAsistenciaToSupabase(nuevoRegistro);
     showToast(`Asistencia registrada: PRESENTE (RU: ${nuevoRegistro.registroUniversitario})`);
   };
@@ -431,9 +588,15 @@ export default function App() {
         totalAsignaturas={asignaturas.length}
         totalEstudiantes={estudiantes.length}
         activeTab={activeMainTab}
-        onChangeTab={(tab) => setActiveMainTab(tab)}
+        onChangeTab={(tab) => {
+          setActiveMainTab(tab);
+          if (tab === 'DOCENTE') {
+            setActiveTeacherSection('DASHBOARD');
+          }
+        }}
         onNavigateHome={() => setActiveMainTab('ESTUDIANTE')}
         onUnlockDocente={handleUnlockDocente}
+        onOpenDocenteGraficos={handleOpenDocenteGraficos}
       />
 
       {/* Main Content Area: El estudiante solo ve el Portal Estudiante directamente */}
@@ -450,6 +613,8 @@ export default function App() {
             registrosAsistencia={registrosAsistencia}
             sesionesHabilitacion={sesionesHabilitacion}
             notas={notas}
+            initialSection={activeTeacherSection}
+            onSectionChange={(sec) => setActiveTeacherSection(sec)}
             onOpenAddSubjectModal={handleOpenAddModal}
             onEditSubject={handleEditSubject}
             onDeleteSubject={handleDeleteSubjectClick}

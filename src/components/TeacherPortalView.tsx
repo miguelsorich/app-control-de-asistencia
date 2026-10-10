@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Asignatura,
   Estudiante,
@@ -12,6 +12,8 @@ import { AttendanceEnablementManager } from './AttendanceEnablementManager';
 import { AttendanceReportsView } from './AttendanceReportsView';
 import { SubjectGradesView } from './SubjectGradesView';
 import { SubjectStudentsView } from './SubjectStudentsView';
+import { TeacherAttendanceCharts } from './TeacherAttendanceCharts';
+import { AttendanceMarkingHistory } from './AttendanceMarkingHistory';
 import {
   GraduationCap,
   LayoutGrid,
@@ -33,6 +35,8 @@ import {
   AlertCircle,
   ShieldCheck,
   Layers,
+  BarChart3,
+  History,
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
@@ -41,6 +45,8 @@ interface TeacherPortalViewProps {
   registrosAsistencia: RegistroAsistencia[];
   sesionesHabilitacion: Record<string, SesionHabilitacion>;
   notas: NotaEstudiante[];
+  initialSection?: DocenteSection;
+  onSectionChange?: (section: DocenteSection) => void;
   onOpenAddSubjectModal: () => void;
   onEditSubject: (asig: Asignatura) => void;
   onDeleteSubject: (id: string, nombre: string) => void;
@@ -55,11 +61,13 @@ interface TeacherPortalViewProps {
 
 export type DocenteSection =
   | 'DASHBOARD'
+  | 'GRAFICOS'
   | 'ASIGNATURAS'
   | 'ESTUDIANTES'
   | 'HABILITACION'
   | 'REPORTES'
-  | 'NOTAS';
+  | 'NOTAS'
+  | 'HISTORIAL';
 
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   asignaturas,
@@ -67,6 +75,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   registrosAsistencia,
   sesionesHabilitacion,
   notas,
+  initialSection = 'DASHBOARD',
+  onSectionChange,
   onOpenAddSubjectModal,
   onEditSubject,
   onDeleteSubject,
@@ -81,18 +91,45 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   // ==========================================
   // MÓDULO 9: AUTENTICACIÓN DEL DOCENTE
   // ==========================================
-  const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState<boolean>(false);
+  const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('uagrm_docente_authenticated') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [usuarioInput, setUsuarioInput] = useState('');
   const [contrasenaInput, setContrasenaInput] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Active section inside the Teacher Portal
-  const [activeSection, setActiveSection] = useState<DocenteSection>('DASHBOARD');
+  const [activeSection, setActiveSectionState] = useState<DocenteSection>(initialSection);
+
+  // Synchronize if initialSection changes from outside
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSectionState(initialSection);
+    }
+  }, [initialSection]);
+
+  const setActiveSection = (section: DocenteSection) => {
+    setActiveSectionState(section);
+    if (onSectionChange) {
+      onSectionChange(section);
+    }
+  };
 
   // Sub-states for specific sections
   const [selectedSubjectForStudentsId, setSelectedSubjectForStudentsId] = useState<string | null>(null);
+  const [selectedSubjectForReportsId, setSelectedSubjectForReportsId] = useState<string | null>(null);
   const [searchTermAsignaturas, setSearchTermAsignaturas] = useState('');
   const [selectedModalidadFilter, setSelectedModalidadFilter] = useState<string>('TODAS');
+
+  // Navigation from chart to detailed reports of a subject
+  const handleNavigateToReportFromChart = (asignaturaId: string) => {
+    setSelectedSubjectForReportsId(asignaturaId);
+    setActiveSection('REPORTES');
+  };
 
   // Login handler
   const handleTeacherLogin = (e: React.FormEvent) => {
@@ -107,6 +144,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     // Contraseña: 6379
     if (cleanUser === '6379' && cleanPass === '6379') {
       setIsTeacherAuthenticated(true);
+      try {
+        localStorage.setItem('uagrm_docente_authenticated', 'true');
+      } catch (err) {
+        console.warn('localStorage error', err);
+      }
       setUsuarioInput('');
       setContrasenaInput('');
       setLoginError(null);
@@ -119,6 +161,11 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   // Logout handler
   const handleTeacherLogout = () => {
     setIsTeacherAuthenticated(false);
+    try {
+      localStorage.removeItem('uagrm_docente_authenticated');
+    } catch (err) {
+      console.warn('localStorage error', err);
+    }
     setUsuarioInput('');
     setContrasenaInput('');
     setLoginError(null);
@@ -264,6 +311,25 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               <span>Ingresar</span>
               <ChevronRight className="w-4 h-4" />
             </button>
+
+            {/* Acceso Rápido Directo para el Docente Miguel Sorich */}
+            <button
+              id="btn-teacher-acceso-rapido"
+              type="button"
+              onClick={() => {
+                setIsTeacherAuthenticated(true);
+                try {
+                  localStorage.setItem('uagrm_docente_authenticated', 'true');
+                } catch (e) {
+                  console.warn(e);
+                }
+                setActiveSection('DASHBOARD');
+              }}
+              className="w-full py-2.5 px-3 bg-[#E8F0FC] hover:bg-blue-100 text-[#174EAF] text-xs font-bold rounded-xl border border-[#DCE3EC] flex items-center justify-center gap-2 cursor-pointer transition-colors"
+            >
+              <ShieldCheck className="w-4 h-4 text-[#174EAF]" />
+              <span>Acceso Directo Docente (Miguel Sorich - Cód. 6379)</span>
+            </button>
           </form>
 
           {/* Volver a la vista del estudiante */}
@@ -327,7 +393,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           {activeSection !== 'DASHBOARD' && (
             <button
               id="btn-nav-volver-dashboard-docente"
@@ -339,7 +405,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               className="inline-flex items-center gap-1.5 text-xs font-bold text-[#174EAF] hover:text-[#103B88] bg-[#E8F0FC] hover:bg-blue-100 border border-[#DCE3EC] px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Volver al Portal Docente</span>
+              <span>Volver al Dashboard</span>
             </button>
           )}
 
@@ -354,6 +420,128 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
             <span>Cerrar sesión</span>
           </button>
         </div>
+      </div>
+
+      {/* Barra de Navegación Rápida entre Secciones del Portal Docente */}
+      <div className="pt-3 border-t border-[#DCE3EC] flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveSection('DASHBOARD');
+            setSelectedSubjectForStudentsId(null);
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeSection === 'DASHBOARD'
+              ? 'bg-[#174EAF] text-white shadow-xs'
+              : 'bg-[#F5F7FA] text-[#667085] hover:text-[#172033] hover:bg-[#E8F0FC]'
+          }`}
+        >
+          <LayoutGrid className="w-3.5 h-3.5" />
+          <span>Dashboard</span>
+        </button>
+
+        <button
+          id="btn-tab-docente-graficos"
+          type="button"
+          onClick={() => setActiveSection('GRAFICOS')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer border ${
+            activeSection === 'GRAFICOS'
+              ? 'bg-[#174EAF] text-white border-[#174EAF] shadow-xs'
+              : 'bg-[#E8F0FC] text-[#174EAF] border-blue-200 hover:bg-blue-100'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-[#174EAF] group-hover:scale-110" />
+          <span>Resumen Visual de Rendimiento</span>
+          <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+            activeSection === 'GRAFICOS' ? 'bg-white text-[#174EAF]' : 'bg-[#174EAF] text-white'
+          }`}>
+            Recharts
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('ASIGNATURAS')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeSection === 'ASIGNATURAS'
+              ? 'bg-[#174EAF] text-white shadow-xs'
+              : 'bg-[#F5F7FA] text-[#667085] hover:text-[#172033] hover:bg-[#E8F0FC]'
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>1. Asignaturas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedSubjectForStudentsId(null);
+            setActiveSection('ESTUDIANTES');
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeSection === 'ESTUDIANTES'
+              ? 'bg-[#174EAF] text-white shadow-xs'
+              : 'bg-[#F5F7FA] text-[#667085] hover:text-[#172033] hover:bg-[#E8F0FC]'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          <span>2. Estudiantes</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('HABILITACION')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeSection === 'HABILITACION'
+              ? 'bg-[#174EAF] text-white shadow-xs'
+              : 'bg-[#F5F7FA] text-[#667085] hover:text-[#172033] hover:bg-[#E8F0FC]'
+          }`}
+        >
+          <Timer className="w-3.5 h-3.5" />
+          <span>3. Habilitar</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedSubjectForReportsId(null);
+            setActiveSection('REPORTES');
+          }}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeSection === 'REPORTES'
+              ? 'bg-[#174EAF] text-white shadow-xs'
+              : 'bg-[#F5F7FA] text-[#667085] hover:text-[#172033] hover:bg-[#E8F0FC]'
+          }`}
+        >
+          <FileSpreadsheet className="w-3.5 h-3.5" />
+          <span>4. Reportes</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('NOTAS')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeSection === 'NOTAS'
+              ? 'bg-[#174EAF] text-white shadow-xs'
+              : 'bg-[#F5F7FA] text-[#667085] hover:text-[#172033] hover:bg-[#E8F0FC]'
+          }`}
+        >
+          <GraduationCap className="w-3.5 h-3.5" />
+          <span>5. Notas</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSection('HISTORIAL')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
+            activeSection === 'HISTORIAL'
+              ? 'bg-[#174EAF] text-white shadow-xs'
+              : 'bg-[#F5F7FA] text-[#667085] hover:text-[#172033] hover:bg-[#E8F0FC]'
+          }`}
+        >
+          <History className="w-3.5 h-3.5" />
+          <span>6. Historial</span>
+        </button>
       </div>
     </div>
   );
@@ -430,6 +618,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
           </div>
         </div>
 
+        {/* RESUMEN VISUAL DE RENDIMIENTO GRUPAL CON RECHARTS */}
+        <TeacherAttendanceCharts
+          asignaturas={asignaturas}
+          estudiantes={estudiantes}
+          registrosAsistencia={registrosAsistencia}
+          onNavigateToReport={handleNavigateToReportFromChart}
+        />
+
         {/* 5 TARJETAS PRINCIPALES DEL PORTAL DOCENTE */}
         <div className="space-y-4">
           <h3 className="text-xs font-bold text-[#667085] uppercase tracking-wider">
@@ -437,6 +633,36 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {/* 0. RESUMEN VISUAL Y GRÁFICOS (RECHARTS) */}
+            <div
+              id="card-teacher-resumen-graficos"
+              onClick={() => setActiveSection('GRAFICOS')}
+              className="bg-white rounded-2xl border-2 border-[#174EAF]/30 hover:border-[#174EAF] hover:shadow-md transition-all duration-200 p-6 flex flex-col justify-between cursor-pointer group bg-gradient-to-br from-white to-blue-50/30"
+            >
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#174EAF] text-white transition-colors flex items-center justify-center shadow-xs">
+                  <BarChart3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-lg font-bold text-[#172033] group-hover:text-[#174EAF] transition-colors">
+                      Gráficos & Rendimiento
+                    </h4>
+                    <span className="text-[10px] bg-blue-100 text-[#174EAF] font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                      Recharts
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#667085] mt-1.5 leading-relaxed">
+                    Monitorear en tiempo real el porcentaje promedio de asistencia por materia, distribución grupal y métricas de rendimiento en vivo.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 pt-4 border-t border-[#DCE3EC] flex items-center justify-between text-xs font-bold text-[#174EAF]">
+                <span>Ver gráficos y análisis</span>
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
             {/* 1. GESTIÓN DE ASIGNATURAS */}
             <div
               id="card-teacher-gestion-asignaturas"
@@ -515,7 +741,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
             {/* 4. REPORTES DE ASISTENCIA */}
             <div
               id="card-teacher-reportes-asistencia"
-              onClick={() => setActiveSection('REPORTES')}
+              onClick={() => {
+                setSelectedSubjectForReportsId(null);
+                setActiveSection('REPORTES');
+              }}
               className="bg-white rounded-2xl border border-[#DCE3EC] hover:border-[#174EAF] hover:shadow-md transition-all duration-200 p-6 flex flex-col justify-between cursor-pointer group"
             >
               <div className="space-y-4">
@@ -541,7 +770,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
             <div
               id="card-teacher-importacion-notas"
               onClick={() => setActiveSection('NOTAS')}
-              className="bg-white rounded-2xl border border-[#DCE3EC] hover:border-[#174EAF] hover:shadow-md transition-all duration-200 p-6 flex flex-col justify-between cursor-pointer group md:col-span-2 lg:col-span-1"
+              className="bg-white rounded-2xl border border-[#DCE3EC] hover:border-[#174EAF] hover:shadow-md transition-all duration-200 p-6 flex flex-col justify-between cursor-pointer group"
             >
               <div className="space-y-4">
                 <div className="w-12 h-12 rounded-2xl bg-[#E8F0FC] text-[#174EAF] group-hover:bg-[#174EAF] group-hover:text-white transition-colors flex items-center justify-center shadow-2xs">
@@ -561,8 +790,40 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
+
+            {/* 6. HISTORIAL DE MARCACIONES (AUDITORÍA GLOBAL) */}
+            <div
+              id="card-teacher-historial-marcaciones"
+              onClick={() => setActiveSection('HISTORIAL')}
+              className="bg-white rounded-2xl border border-[#DCE3EC] hover:border-[#174EAF] hover:shadow-md transition-all duration-200 p-6 flex flex-col justify-between cursor-pointer group"
+            >
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#E8F0FC] text-[#174EAF] group-hover:bg-[#174EAF] group-hover:text-white transition-colors flex items-center justify-center shadow-2xs">
+                  <History className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-lg font-bold text-[#172033] group-hover:text-[#174EAF] transition-colors">
+                    6. Historial de marcaciones
+                  </h4>
+                  <p className="text-xs text-[#667085] mt-1.5 leading-relaxed">
+                    Auditoría en tiempo real, tabla paginada con los últimos registros de asistencia globales y detección de duplicados.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 pt-4 border-t border-[#DCE3EC] flex items-center justify-between text-xs font-bold text-[#174EAF]">
+                <span>Ver historial y duplicados</span>
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* COMPONENTE HISTORIAL DE MARCACIONES DENTRO DEL DASHBOARD */}
+        <AttendanceMarkingHistory
+          asignaturas={asignaturas}
+          estudiantes={estudiantes}
+          registrosAsistencia={registrosAsistencia}
+        />
       </div>
     );
   }
@@ -810,6 +1071,24 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   }
 
   // ==========================================
+  // SECTION: GRÁFICOS Y RENDIMIENTO (RECHARTS)
+  // ==========================================
+  if (activeSection === 'GRAFICOS') {
+    return (
+      <div id="teacher-section-graficos" className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-150">
+        {renderTeacherPortalHeader('Resumen Visual con Gráficos (Recharts)')}
+
+        <TeacherAttendanceCharts
+          asignaturas={asignaturas}
+          estudiantes={estudiantes}
+          registrosAsistencia={registrosAsistencia}
+          onNavigateToReport={handleNavigateToReportFromChart}
+        />
+      </div>
+    );
+  }
+
+  // ==========================================
   // SECTION 3: HABILITAR ASISTENCIA (MÓDULO 4)
   // ==========================================
   if (activeSection === 'HABILITACION') {
@@ -837,10 +1116,19 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
       <div id="teacher-section-reportes" className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-150">
         {renderTeacherPortalHeader('4. Reportes de asistencia')}
 
+        {/* Resumen Gráfico Recharts incorporado en Reportes */}
+        <TeacherAttendanceCharts
+          asignaturas={asignaturas}
+          estudiantes={estudiantes}
+          registrosAsistencia={registrosAsistencia}
+          onNavigateToReport={(asigId) => setSelectedSubjectForReportsId(asigId)}
+        />
+
         <AttendanceReportsView
           asignaturas={asignaturas}
           estudiantes={estudiantes}
           registrosAsistencia={registrosAsistencia}
+          initialSelectedSubjectId={selectedSubjectForReportsId}
         />
       </div>
     );
@@ -859,6 +1147,23 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
           estudiantes={estudiantes}
           notas={notas}
           onSaveGrades={onSaveGrades}
+        />
+      </div>
+    );
+  }
+
+  // ==========================================
+  // SECTION 6: HISTORIAL DE MARCACIONES (AUDITORÍA GLOBAL)
+  // ==========================================
+  if (activeSection === 'HISTORIAL') {
+    return (
+      <div id="teacher-section-historial" className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-150">
+        {renderTeacherPortalHeader('6. Historial de marcaciones')}
+
+        <AttendanceMarkingHistory
+          asignaturas={asignaturas}
+          estudiantes={estudiantes}
+          registrosAsistencia={registrosAsistencia}
         />
       </div>
     );

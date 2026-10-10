@@ -572,9 +572,26 @@ export const AttendanceEnablementManager: React.FC<AttendanceEnablementManagerPr
                     </button>
 
                     {!isTestSimulationMode && validationResult && !validationResult.puedeHabilitar && (
-                      <p className="text-[11px] text-[#667085] text-center mt-2">
-                        La habilitación requiere corresponder al día y horario de la clase (o active el interruptor de modo prueba arriba).
-                      </p>
+                      <div className="space-y-2 mt-2.5">
+                        <button
+                          id="btn-habilitar-sesion-extraordinaria"
+                          type="button"
+                          onClick={() => {
+                            onHabilitarAsistencia(selectedSubject.id, duracionMinutos);
+                            setActionNotice(
+                              `¡Asistencia habilitada para ${selectedSubject.sigla} por ${duracionMinutos} minutos!`
+                            );
+                            setTimeout(() => setActionNotice(null), 4000);
+                          }}
+                          className="w-full py-2.5 px-4 bg-[#E8F0FC] hover:bg-[#DCE3EC] text-[#174EAF] border border-[#174EAF]/30 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>Habilitar de todos modos (Sesión Extraordinaria)</span>
+                        </button>
+                        <p className="text-[11px] text-[#667085] text-center">
+                          Permite abrir la asistencia fuera del horario estricto para clases de repaso, recuperaciones o pruebas.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>

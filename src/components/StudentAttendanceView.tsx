@@ -131,10 +131,10 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
     ? Math.max(0, currentSession.expiraTimestamp - currentClock)
     : 0;
 
-  // Student's own attendance records in this subject
+  // Student's own attendance records in this subject (deduplicados por fecha única de clase)
   const studentAttendanceRecords = useMemo(() => {
     if (!selectedSubject || !currentStudent) return [];
-    return registrosAsistencia
+    const filtered = registrosAsistencia
       .filter(
         (r) =>
           r.asignaturaId === selectedSubject.id &&
@@ -142,6 +142,17 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
             currentStudent.registroUniversitario.trim().toLowerCase()
       )
       .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // Cada fecha de clase asistida se presenta una única vez con su marcación oficial
+    const seenDates = new Set<string>();
+    const uniqueRecords: RegistroAsistencia[] = [];
+    for (const rec of filtered) {
+      if (!seenDates.has(rec.fecha)) {
+        seenDates.add(rec.fecha);
+        uniqueRecords.push(rec);
+      }
+    }
+    return uniqueRecords;
   }, [registrosAsistencia, selectedSubject, currentStudent]);
 
   // Check if student already marked today

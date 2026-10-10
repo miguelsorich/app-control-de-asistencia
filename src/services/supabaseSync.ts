@@ -206,9 +206,38 @@ export async function deleteAsignaturaFromSupabase(id: string): Promise<boolean>
 // ---------------------------------------------
 export async function fetchEstudiantesFromSupabase(): Promise<Estudiante[] | null> {
   try {
-    const { data, error } = await supabase.from('estudiantes').select('*');
-    if (error || !data) return null;
-    return data.map((row: any) => ({
+    let allRecords: any[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('estudiantes')
+        .select('*')
+        .order('fecha_importacion', { ascending: true })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        console.warn('[Supabase] fetchEstudiantes page error:', error.message);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allRecords.push(...data);
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        from += pageSize;
+      }
+    }
+
+    if (allRecords.length === 0) return null;
+    return allRecords.map((row: any) => ({
       id: row.id,
       asignaturaId: row.asignatura_id,
       registroUniversitario: row.registro_universitario,
@@ -246,13 +275,42 @@ export async function saveEstudiantesBatchToSupabase(estudiantes: Estudiante[]):
 }
 
 // ---------------------------------------------
-// ASISTENCIAS
+// ASISTENCIAS (CON PAGINACIÓN COMPLETA >1000 REGISTROS)
 // ---------------------------------------------
 export async function fetchAsistenciasFromSupabase(): Promise<RegistroAsistencia[] | null> {
   try {
-    const { data, error } = await supabase.from('registros_asistencia').select('*');
-    if (error || !data) return null;
-    return data.map((row: any) => ({
+    let allRecords: any[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from('registros_asistencia')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) {
+        console.warn('[Supabase] fetchAsistencias page error:', error.message);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allRecords.push(...data);
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        from += pageSize;
+      }
+    }
+
+    if (allRecords.length === 0) return null;
+    return allRecords.map((row: any) => ({
       id: row.id,
       asignaturaId: row.asignatura_id,
       registroUniversitario: row.registro_universitario,
@@ -289,15 +347,45 @@ export async function saveAsistenciaToSupabase(asis: RegistroAsistencia): Promis
   }
 }
 
+export async function saveAsistenciasBatchToSupabase(registros: RegistroAsistencia[]): Promise<boolean> {
+  if (!registros || registros.length === 0) return true;
+  try {
+    const payload = registros.map((a) => ({
+      id: a.id,
+      asignatura_id: a.asignaturaId,
+      registro_universitario: a.registroUniversitario,
+      fecha: a.fecha,
+      hora_marcado: a.horaMarcado,
+      estado: a.estado,
+      timestamp: a.timestamp,
+    }));
+    const { error } = await supabase.from('registros_asistencia').upsert(payload);
+    if (error) {
+      console.warn('[Supabase] saveAsistenciasBatch error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('[Supabase] saveAsistenciasBatch failed:', e);
+    return false;
+  }
+}
+
 // ---------------------------------------------
-// SESIONES HABILITACION
+// SESIONES HABILITACION (ORDENADAS POR TIMESTAMP)
 // ---------------------------------------------
 export async function fetchSesionesFromSupabase(): Promise<Record<string, SesionHabilitacion> | null> {
   try {
-    const { data, error } = await supabase.from('sesiones_habilitacion').select('*');
+    const { data, error } = await supabase
+      .from('sesiones_habilitacion')
+      .select('*')
+      .order('creado_timestamp', { ascending: true });
+
     if (error || !data) return null;
     const map: Record<string, SesionHabilitacion> = {};
     for (const row of data) {
+      // Al ordenar ascendente por creado_timestamp, la última fila procesada
+      // para cada asignatura_id será siempre la más reciente creada.
       map[row.asignatura_id] = {
         id: row.id,
         asignaturaId: row.asignatura_id,

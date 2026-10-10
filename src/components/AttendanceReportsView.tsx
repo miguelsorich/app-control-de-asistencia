@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Asignatura, Estudiante, RegistroAsistencia, MODALIDADES } from '../types';
 import { formatTimeRange } from '../utils/timeHelpers';
 import {
@@ -38,6 +38,12 @@ export const AttendanceReportsView: React.FC<AttendanceReportsViewProps> = ({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialSelectedSubjectId && asignaturas.some((a) => a.id === initialSelectedSubjectId)) {
+      setSelectedSubjectId(initialSelectedSubjectId);
+    }
+  }, [initialSelectedSubjectId, asignaturas]);
 
   const selectedSubject = asignaturas.find((a) => a.id === selectedSubjectId) || asignaturas[0];
 

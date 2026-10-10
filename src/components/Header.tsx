@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { UserCheck, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { UserCheck, ShieldCheck, ArrowLeft, BarChart3 } from 'lucide-react';
 
 interface HeaderProps {
   onOpenAddModal?: () => void;
@@ -10,12 +10,14 @@ interface HeaderProps {
   activeSubjectName?: string | null;
   onNavigateHome?: () => void;
   onUnlockDocente?: () => void;
+  onOpenDocenteGraficos?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onChangeTab,
   onUnlockDocente,
+  onOpenDocenteGraficos,
 }) => {
   const clickCountRef = useRef<number>(0);
   const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -108,10 +110,51 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             ) : (
-              /* Vista oficial del Estudiante: Limpia, sin enlaces ni pestañas del portal docente */
-              <div className="bg-[#103B88] px-3.5 py-1.5 sm:py-2 rounded-xl border border-white/20 flex items-center gap-2 text-xs font-bold text-white shadow-2xs">
-                <UserCheck className="w-4 h-4 text-blue-200" />
-                <span>Portal Estudiante</span>
+              /* Vista oficial con selector de portal visible para acceso docente */
+              <div className="flex items-center gap-2">
+                <div className="bg-[#103B88] px-3.5 py-1.5 sm:py-2 rounded-xl border border-white/20 flex items-center gap-2 text-xs font-bold text-white shadow-2xs">
+                  <UserCheck className="w-4 h-4 text-blue-200" />
+                  <span>Portal Estudiante</span>
+                </div>
+                {/* Acceso directo a Gráficos & Rendimiento (Recharts) */}
+                <button
+                  id="btn-nav-acceso-portal-graficos"
+                  type="button"
+                  onClick={() => {
+                    if (onOpenDocenteGraficos) {
+                      onOpenDocenteGraficos();
+                    } else if (onUnlockDocente) {
+                      onUnlockDocente();
+                    } else {
+                      onChangeTab('DOCENTE');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-[#E8F0FC] text-[#174EAF] hover:bg-white transition-all shadow-xs cursor-pointer border border-white/50"
+                  title="Ver Resumen Visual de Rendimiento con Gráficos (Recharts)"
+                >
+                  <BarChart3 className="w-3.5 h-3.5 text-[#174EAF]" />
+                  <span>Resumen Gráficos</span>
+                  <span className="hidden sm:inline-block text-[9px] bg-[#174EAF] text-white px-1.5 py-0.2 rounded font-bold">
+                    Recharts
+                  </span>
+                </button>
+
+                <button
+                  id="btn-nav-acceso-portal-docente"
+                  type="button"
+                  onClick={() => {
+                    if (onUnlockDocente) {
+                      onUnlockDocente();
+                    } else {
+                      onChangeTab('DOCENTE');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-white text-[#174EAF] hover:bg-blue-50 transition-all shadow-xs cursor-pointer border border-white/40"
+                  title="Acceso al Portal Docente / Administrador (Cód. 6379)"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#174EAF]" />
+                  <span>Portal Docente</span>
+                </button>
               </div>
             )}
           </div>
