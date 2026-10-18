@@ -766,7 +766,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               </div>
             </div>
 
-            {/* 5. IMPORTACIÓN DE NOTAS */}
+            {/* 5. GESTIÓN Y MODIFICACIÓN DE NOTAS */}
             <div
               id="card-teacher-importacion-notas"
               onClick={() => setActiveSection('NOTAS')}
@@ -778,15 +778,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 </div>
                 <div>
                   <h4 className="text-lg font-bold text-[#172033] group-hover:text-[#174EAF] transition-colors">
-                    5. Importación de notas
+                    5. Calificaciones y Notas (Manual y Excel)
                   </h4>
                   <p className="text-xs text-[#667085] mt-1.5 leading-relaxed">
-                    Importar archivo Excel con Registro, Nombre, Primer Parcial, Segundo Parcial, Examen Final y Nota Final oficial.
+                    Modificar manualmente las notas de los estudiantes o importarlas desde Excel (Primer Parcial, Segundo Parcial, Examen Final y Nota Final).
                   </p>
                 </div>
               </div>
               <div className="mt-6 pt-4 border-t border-[#DCE3EC] flex items-center justify-between text-xs font-bold text-[#174EAF]">
-                <span>Importar calificaciones</span>
+                <span>Modificar y gestionar notas</span>
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -1135,12 +1135,12 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   }
 
   // ==========================================
-  // SECTION 5: IMPORTACIÓN DE NOTAS (MÓDULO 6)
+  // SECTION 5: CALIFICACIONES (MANUAL Y EXCEL)
   // ==========================================
   if (activeSection === 'NOTAS') {
     return (
       <div id="teacher-section-notas" className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-150">
-        {renderTeacherPortalHeader('5. Importación de notas')}
+        {renderTeacherPortalHeader('5. Calificaciones (Modificación manual e importación)')}
 
         <SubjectGradesView
           asignaturas={asignaturas}
