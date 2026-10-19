@@ -225,23 +225,4 @@ export const INITIAL_ATTENDANCE: RegistroAsistencia[] = [
     estado: 'PRESENTE',
     timestamp: 1786025122000,
   },
-  // INF511 - V1 (asig-5) Taller de Grado I
-  {
-    id: 'asist-seed-25',
-    asignaturaId: 'asig-5',
-    registroUniversitario: '220014521',
-    fecha: '2026-08-08',
-    horaMarcado: '07:15:00',
-    estado: 'PRESENTE',
-    timestamp: 1786180500000,
-  },
-  {
-    id: 'asist-seed-26',
-    asignaturaId: 'asig-5',
-    registroUniversitario: '221045123',
-    fecha: '2026-08-08',
-    horaMarcado: '07:22:15',
-    estado: 'PRESENTE',
-    timestamp: 1786180935000,
-  },
 ];

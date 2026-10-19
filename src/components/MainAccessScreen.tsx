@@ -1,11 +1,12 @@
 import React from 'react';
-import { UserCheck, LayoutGrid, ChevronRight, ShieldCheck, GraduationCap, Clock, BookOpen, Award } from 'lucide-react';
+import { UserCheck, LayoutGrid, ChevronRight, GraduationCap, Lock } from 'lucide-react';
 
 interface MainAccessScreenProps {
   onSelectEstudiante: () => void;
   onSelectDocente: () => void;
   totalAsignaturas?: number;
   totalEstudiantes?: number;
+  onOpenAdminLogin?: () => void;
 }
 
 export const MainAccessScreen: React.FC<MainAccessScreenProps> = ({
@@ -13,6 +14,7 @@ export const MainAccessScreen: React.FC<MainAccessScreenProps> = ({
   onSelectDocente,
   totalAsignaturas = 0,
   totalEstudiantes = 0,
+  onOpenAdminLogin,
 }) => {
   return (
     <div id="main-access-screen" className="max-w-4xl mx-auto py-4 sm:py-8 space-y-8 animate-in fade-in duration-300">
@@ -51,13 +53,10 @@ export const MainAccessScreen: React.FC<MainAccessScreenProps> = ({
           <p className="text-xs sm:text-sm text-[#667085] leading-relaxed">
             Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas
           </p>
-          <p className="text-xs font-semibold text-[#174EAF]">
-            Docente: Lic. Miguel Antonio Sorich Rojas (Cód. 6379)
-          </p>
         </div>
       </div>
 
-      {/* Main Two Access Cards (Módulo 10) */}
+      {/* Main Two Access Cards */}
       <div>
         <div className="text-center mb-6">
           <h2 className="text-base sm:text-lg font-bold text-[#172033]">
@@ -141,7 +140,7 @@ export const MainAccessScreen: React.FC<MainAccessScreenProps> = ({
                   <LayoutGrid className="w-7 h-7" />
                 </div>
                 <span className="bg-[#103B88] text-white text-xs font-bold px-3 py-1 rounded-full">
-                  Administrador
+                  Docentes
                 </span>
               </div>
 
@@ -151,7 +150,7 @@ export const MainAccessScreen: React.FC<MainAccessScreenProps> = ({
                   Portal Docente
                 </h3>
                 <p className="text-xs sm:text-sm text-[#667085] leading-relaxed">
-                  Acceso exclusivo para el docente con <strong>Código de Docente</strong> y contraseña para gestión de materias, control en vivo de asistencias, reportes y notas.
+                  Acceso para docentes con su usuario y contraseña para gestión de materias, control en vivo de asistencias, reportes y notas.
                 </p>
               </div>
 
@@ -159,7 +158,7 @@ export const MainAccessScreen: React.FC<MainAccessScreenProps> = ({
               <div className="space-y-1.5 pt-2 border-t border-[#DCE3EC]/60 text-xs text-[#667085]">
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#103B88]" />
-                  <span>Gestión de asignaturas, grupos y semestres</span>
+                  <span>Búsqueda en oferta académica o creación manual</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#103B88]" />
@@ -167,7 +166,7 @@ export const MainAccessScreen: React.FC<MainAccessScreenProps> = ({
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#103B88]" />
-                  <span>Reportes oficiales e importación de calificaciones</span>
+                  <span>Reportes oficiales y modificación manual de calificaciones</span>
                 </div>
               </div>
             </div>
@@ -187,6 +186,21 @@ export const MainAccessScreen: React.FC<MainAccessScreenProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Candado discreto de acceso propietario al final */}
+        {onOpenAdminLogin && (
+          <div className="flex justify-center pt-6">
+            <button
+              type="button"
+              onClick={onOpenAdminLogin}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] text-slate-400 hover:text-slate-600 transition-colors cursor-pointer rounded-lg hover:bg-slate-100"
+              title="Acceso de Gestión con Clave"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-500/70" />
+              <span>Acceso de Seguridad</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

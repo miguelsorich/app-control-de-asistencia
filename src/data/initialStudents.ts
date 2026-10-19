@@ -107,21 +107,4 @@ export const INITIAL_STUDENTS: Estudiante[] = [
     correoElectronico: 'gabriel.flores@uagrm.edu.bo',
     fechaImportacion: Date.now() - 3600000 * 8,
   },
-  // asig-5: Taller de Grado I (INF511 - V1)
-  {
-    id: 'est-14',
-    asignaturaId: 'asig-5',
-    registroUniversitario: '220014521',
-    nombreCompleto: 'Alvarez Torrico Carlos Daniel',
-    correoElectronico: 'carlos.alvarez@uagrm.edu.bo',
-    fechaImportacion: Date.now() - 3600000 * 5,
-  },
-  {
-    id: 'est-15',
-    asignaturaId: 'asig-5',
-    registroUniversitario: '221045123',
-    nombreCompleto: 'Cabrera Justiniano Jorge Luis',
-    correoElectronico: 'jorge.cabrera@uagrm.edu.bo',
-    fechaImportacion: Date.now() - 3600000 * 5,
-  },
 ];

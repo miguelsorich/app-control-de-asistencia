@@ -6,6 +6,8 @@ import {
   SesionHabilitacion,
   NotaEstudiante,
   MODALIDADES,
+  DocenteUsuario,
+  OfertaAcademicaItem,
 } from '../types';
 import { formatTimeRange } from '../utils/timeHelpers';
 import { AttendanceEnablementManager } from './AttendanceEnablementManager';
@@ -14,6 +16,9 @@ import { SubjectGradesView } from './SubjectGradesView';
 import { SubjectStudentsView } from './SubjectStudentsView';
 import { TeacherAttendanceCharts } from './TeacherAttendanceCharts';
 import { AttendanceMarkingHistory } from './AttendanceMarkingHistory';
+import { SelectFromOfferModal } from './SelectFromOfferModal';
+import { TeacherChangeCredentialsModal } from './TeacherChangeCredentialsModal';
+import { INITIAL_DOCENTES } from '../data/initialDocentes';
 import {
   GraduationCap,
   LayoutGrid,
@@ -37,6 +42,9 @@ import {
   Layers,
   BarChart3,
   History,
+  Key,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface TeacherPortalViewProps {
@@ -45,6 +53,13 @@ interface TeacherPortalViewProps {
   registrosAsistencia: RegistroAsistencia[];
   sesionesHabilitacion: Record<string, SesionHabilitacion>;
   notas: NotaEstudiante[];
+  docentes?: DocenteUsuario[];
+  ofertaAcademica?: OfertaAcademicaItem[];
+  currentDocente?: DocenteUsuario | null;
+  onLoginDocente?: (doc: DocenteUsuario) => void;
+  onLogoutDocente?: () => void;
+  onUpdateDocente?: (doc: DocenteUsuario) => void;
+  onSelectOfertaItem?: (item: OfertaAcademicaItem) => void;
   initialSection?: DocenteSection;
   onSectionChange?: (section: DocenteSection) => void;
   onOpenAddSubjectModal: () => void;
@@ -75,6 +90,13 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   registrosAsistencia,
   sesionesHabilitacion,
   notas,
+  docentes = [],
+  ofertaAcademica = [],
+  currentDocente = null,
+  onLoginDocente,
+  onLogoutDocente,
+  onUpdateDocente,
+  onSelectOfertaItem,
   initialSection = 'DASHBOARD',
   onSectionChange,
   onOpenAddSubjectModal,
@@ -89,17 +111,21 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   onLogoutToMain,
 }) => {
   // ==========================================
-  // MÓDULO 9: AUTENTICACIÓN DEL DOCENTE
+  // AUTENTICACIÓN Y GESTIÓN DE DOCENTE
   // ==========================================
+  const [currentTeacher, setCurrentTeacher] = useState<DocenteUsuario | null>(() => {
+    if (currentDocente) return currentDocente;
+    return null;
+  });
+  const [isSelectOfferOpen, setIsSelectOfferOpen] = useState(false);
+  const [isChangeProfileOpen, setIsChangeProfileOpen] = useState(false);
   const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('uagrm_docente_authenticated') === 'true';
-    } catch {
-      return false;
-    }
+    if (currentDocente) return true;
+    return false;
   });
   const [usuarioInput, setUsuarioInput] = useState('');
   const [contrasenaInput, setContrasenaInput] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // Active section inside the Teacher Portal
@@ -131,21 +157,42 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     setActiveSection('REPORTES');
   };
 
-  // Login handler
+  // Synchronize currentTeacher when prop changes
+  useEffect(() => {
+    if (currentDocente) {
+      setCurrentTeacher(currentDocente);
+      setIsTeacherAuthenticated(true);
+    } else {
+      setCurrentTeacher(null);
+      setIsTeacherAuthenticated(false);
+    }
+  }, [currentDocente]);
+
+  // Login handler: cada docente (incluyendo Lic. Miguel Antonio Sorich Rojas) debe ingresar con su usuario y contraseña
   const handleTeacherLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
 
-    const cleanUser = usuarioInput.trim();
+    const cleanUser = usuarioInput.trim().toLowerCase();
     const cleanPass = contrasenaInput.trim();
 
-    // Valid credentials:
-    // Usuario: 6379
-    // Contraseña: 6379
-    if (cleanUser === '6379' && cleanPass === '6379') {
+    const docList = (docentes && docentes.length > 0) ? docentes : INITIAL_DOCENTES;
+    const matched = docList.find(
+      (d) =>
+        (d.codigoDocente.trim().toLowerCase() === cleanUser || d.correo.trim().toLowerCase() === cleanUser) &&
+        d.contrasena.trim() === cleanPass
+    );
+
+    if (matched) {
+      if (matched.activo === false) {
+        setLoginError('Esta cuenta de docente está inactiva o bloqueada. Por favor consulte con el Administrador.');
+        return;
+      }
       setIsTeacherAuthenticated(true);
+      setCurrentTeacher(matched);
       try {
         localStorage.setItem('uagrm_docente_authenticated', 'true');
+        localStorage.setItem('uagrm_docente_current_teacher', JSON.stringify(matched));
       } catch (err) {
         console.warn('localStorage error', err);
       }
@@ -153,6 +200,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
       setContrasenaInput('');
       setLoginError(null);
       setActiveSection('DASHBOARD');
+      if (onLoginDocente) {
+        onLoginDocente(matched);
+      }
     } else {
       setLoginError('Usuario o contraseña incorrectos.');
     }
@@ -161,8 +211,10 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   // Logout handler
   const handleTeacherLogout = () => {
     setIsTeacherAuthenticated(false);
+    setCurrentTeacher(null);
     try {
       localStorage.removeItem('uagrm_docente_authenticated');
+      localStorage.removeItem('uagrm_docente_current_teacher');
     } catch (err) {
       console.warn('localStorage error', err);
     }
@@ -171,14 +223,29 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     setLoginError(null);
     setActiveSection('DASHBOARD');
     setSelectedSubjectForStudentsId(null);
+    if (onLogoutDocente) {
+      onLogoutDocente();
+    }
     if (onLogoutToMain) {
       onLogoutToMain();
     }
   };
 
+  // Filter subjects for current teacher: Un docente nuevo empieza totalmente limpio (0 asignaturas)
+  const teacherAsignaturas = useMemo(() => {
+    if (!currentTeacher) return [];
+    return asignaturas.filter((asig) => {
+      if (asig.docenteId) {
+        return asig.docenteId === currentTeacher.id || asig.docenteId === currentTeacher.codigoDocente;
+      }
+      // Solo si es el docente Miguel Sorich y la materia no tiene docenteId explícito
+      return currentTeacher.codigoDocente === '6379' || currentTeacher.id === 'docente-6379';
+    });
+  }, [asignaturas, currentTeacher]);
+
   // Filtered subjects for Section 1 (Gestión de Asignaturas)
   const filteredAsignaturas = useMemo(() => {
-    return asignaturas.filter((asig) => {
+    return teacherAsignaturas.filter((asig) => {
       const term = searchTermAsignaturas.toLowerCase();
       const semStr = `semestre ${asig.semestre || 1}`;
       const anioStr = String(asig.año || 2026);
@@ -194,7 +261,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
       return matchesSearch && matchesModalidad;
     });
-  }, [asignaturas, searchTermAsignaturas, selectedModalidadFilter]);
+  }, [teacherAsignaturas, searchTermAsignaturas, selectedModalidadFilter]);
 
   // Selected subject for Students section
   const selectedSubjectForStudents = useMemo(() => {
@@ -208,9 +275,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   }, [estudiantes, selectedSubjectForStudents]);
 
   // Modalidad counts
-  const countLunMieVie = asignaturas.filter((a) => a.modalidad === 'LUN_MIE_VIE').length;
-  const countMarJue = asignaturas.filter((a) => a.modalidad === 'MAR_JUE').length;
-  const countSabado = asignaturas.filter((a) => a.modalidad === 'SABADO').length;
+  const countLunMieVie = teacherAsignaturas.filter((a) => a.modalidad === 'LUN_MIE_VIE').length;
+  const countMarJue = teacherAsignaturas.filter((a) => a.modalidad === 'MAR_JUE').length;
+  const countSabado = teacherAsignaturas.filter((a) => a.modalidad === 'SABADO').length;
 
   // ==========================================
   // VIEW 1: ACCESO DOCENTE (LOGIN)
@@ -245,7 +312,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               Sistema de Control de Asistencia — UAGRM
             </p>
             <p className="text-[11px] text-[#667085]">
-              Docente: <strong>Miguel Antonio Sorich Rojas</strong> (Código: 6379)
+              Ingrese con su usuario o correo institucional y contraseña
             </p>
           </div>
 
@@ -256,38 +323,52 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 htmlFor="input-teacher-usuario"
                 className="block text-xs font-bold text-[#172033] mb-1.5 uppercase tracking-wider"
               >
-                Usuario
+                Usuario / Correo *
               </label>
               <input
                 id="input-teacher-usuario"
                 type="text"
+                required
+                autoComplete="username"
                 autoFocus
                 value={usuarioInput}
                 onChange={(e) => {
                   setUsuarioInput(e.target.value);
                   if (loginError) setLoginError(null);
                 }}
-                placeholder="Código docente"
+                placeholder="Ingrese su usuario o código (ej. 6379)"
                 className="w-full px-4 py-2.5 text-sm font-mono font-medium rounded-xl border border-[#DCE3EC] focus:outline-none focus:ring-2 focus:ring-[#174EAF] focus:border-[#174EAF] bg-white text-[#172033] placeholder:font-sans placeholder:text-[#667085]"
               />
             </div>
 
             <div>
-              <label
-                htmlFor="input-teacher-contrasena"
-                className="block text-xs font-bold text-[#172033] mb-1.5 uppercase tracking-wider"
-              >
-                Contraseña
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="input-teacher-contrasena"
+                  className="block text-xs font-bold text-[#172033] uppercase tracking-wider"
+                >
+                  Contraseña *
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="text-[11px] text-[#667085] hover:text-[#174EAF] flex items-center gap-1 cursor-pointer"
+                >
+                  {showLoginPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>{showLoginPassword ? 'Ocultar' : 'Ver'}</span>
+                </button>
+              </div>
               <input
                 id="input-teacher-contrasena"
-                type="password"
+                type={showLoginPassword ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
                 value={contrasenaInput}
                 onChange={(e) => {
                   setContrasenaInput(e.target.value);
                   if (loginError) setLoginError(null);
                 }}
-                placeholder="Contraseña"
+                placeholder="Ingrese su contraseña"
                 className="w-full px-4 py-2.5 text-sm rounded-xl border border-[#DCE3EC] focus:outline-none focus:ring-2 focus:ring-[#174EAF] focus:border-[#174EAF] bg-white text-[#172033] placeholder:text-[#667085]"
               />
             </div>
@@ -311,28 +392,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               <span>Ingresar</span>
               <ChevronRight className="w-4 h-4" />
             </button>
-
-            {/* Acceso Rápido Directo para el Docente Miguel Sorich */}
-            <button
-              id="btn-teacher-acceso-rapido"
-              type="button"
-              onClick={() => {
-                setIsTeacherAuthenticated(true);
-                try {
-                  localStorage.setItem('uagrm_docente_authenticated', 'true');
-                } catch (e) {
-                  console.warn(e);
-                }
-                setActiveSection('DASHBOARD');
-              }}
-              className="w-full py-2.5 px-3 bg-[#E8F0FC] hover:bg-blue-100 text-[#174EAF] text-xs font-bold rounded-xl border border-[#DCE3EC] flex items-center justify-center gap-2 cursor-pointer transition-colors"
-            >
-              <ShieldCheck className="w-4 h-4 text-[#174EAF]" />
-              <span>Acceso Directo Docente (Miguel Sorich - Cód. 6379)</span>
-            </button>
           </form>
 
-          {/* Volver a la vista del estudiante */}
+          {/* Volver a la Vista General */}
           {onVolverPrincipal && (
             <div className="pt-2 border-t border-[#DCE3EC] text-center">
               <button
@@ -342,7 +404,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 className="text-xs font-semibold text-[#174EAF] hover:text-[#103B88] transition-colors cursor-pointer inline-flex items-center gap-1.5"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Volver a la vista del estudiante</span>
+                <span>Volver a la Vista General</span>
               </button>
             </div>
           )}
@@ -354,76 +416,125 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   // ==========================================
   // HEADER DEL PORTAL DOCENTE
   // ==========================================
-  const renderTeacherPortalHeader = (sectionTitle?: string) => (
-    <div className="bg-white rounded-2xl border border-[#DCE3EC] shadow-xs p-5 sm:p-6 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        {/* Profile photo and Teacher Identification */}
-        <div className="flex items-center gap-4">
-          <img
-            src="/docente_miguel.png"
-            alt="Docente Miguel Antonio Sorich Rojas"
-            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-[#174EAF]/30 shadow-xs flex-shrink-0"
-            referrerPolicy="no-referrer"
-          />
+  const renderTeacherPortalHeader = (sectionTitle?: string) => {
+    const teacherName = currentTeacher ? currentTeacher.nombreCompleto : 'Lic. Miguel Antonio Sorich Rojas';
+    const teacherCode = currentTeacher ? currentTeacher.codigoDocente : '6379';
+    const teacherCareer = currentTeacher?.carrera || 'Facultad de Ciencias Contables';
 
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC]">
-                Portal Docente
-              </span>
-              {sectionTitle && (
-                <span className="bg-[#F5F7FA] text-[#172033] border border-[#DCE3EC] text-xs font-bold px-2 py-0.5 rounded">
-                  {sectionTitle}
+    return (
+      <div className="bg-white rounded-2xl border border-[#DCE3EC] shadow-xs p-5 sm:p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Profile photo and Teacher Identification */}
+          <div className="flex items-center gap-4">
+            {teacherCode === '6379' ? (
+              <img
+                src="/docente_miguel.png"
+                alt={teacherName}
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-[#174EAF]/30 shadow-xs flex-shrink-0"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#E8F0FC] text-[#174EAF] font-black text-2xl flex items-center justify-center border-2 border-[#174EAF]/30 shadow-xs flex-shrink-0">
+                {teacherName.charAt(0)}
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC]">
+                  Portal Docente
                 </span>
-              )}
-            </div>
+                {sectionTitle && (
+                  <span className="bg-[#F5F7FA] text-[#172033] border border-[#DCE3EC] text-xs font-bold px-2 py-0.5 rounded">
+                    {sectionTitle}
+                  </span>
+                )}
+              </div>
 
-            <h2 className="text-lg sm:text-xl font-black text-[#172033]">
-              Miguel Antonio Sorich Rojas
-            </h2>
+              <h2 className="text-lg sm:text-xl font-black text-[#172033]">
+                {teacherName}
+              </h2>
 
-            <div className="flex items-center gap-3 text-xs text-[#667085] flex-wrap">
-              <span className="font-mono bg-[#E8F0FC] px-2 py-0.5 rounded text-[#174EAF] font-bold border border-[#DCE3EC]">
-                Código docente: <strong>6379</strong>
-              </span>
-              <span>•</span>
-              <span className="text-[#667085]">Docente Titular / Administrador</span>
+              <div className="flex items-center gap-3 text-xs text-[#667085] flex-wrap">
+                <span className="font-mono bg-[#E8F0FC] px-2 py-0.5 rounded text-[#174EAF] font-bold border border-[#DCE3EC]">
+                  Código docente: <strong>{teacherCode}</strong>
+                </span>
+                <span>•</span>
+                <span className="text-[#667085]">{teacherCareer}</span>
+              </div>
             </div>
+          </div>
+
+          {/* Action Controls */}
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            {activeSection !== 'DASHBOARD' && (
+              <button
+                id="btn-nav-volver-dashboard-docente"
+                type="button"
+                onClick={() => {
+                  setActiveSection('DASHBOARD');
+                  setSelectedSubjectForStudentsId(null);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#174EAF] hover:text-[#103B88] bg-[#E8F0FC] hover:bg-blue-100 border border-[#DCE3EC] px-3 py-2 rounded-xl transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Volver al Dashboard</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsChangeProfileOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#174EAF] hover:text-[#103B88] bg-[#E8F0FC] hover:bg-blue-100 border border-blue-200 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+              title="Cambiar tu usuario o contraseña de docente"
+            >
+              <Key className="w-3.5 h-3.5 text-[#174EAF]" />
+              <span>Cambiar Clave / Usuario</span>
+            </button>
+
+            {onVolverPrincipal && (
+              <button
+                type="button"
+                onClick={onVolverPrincipal}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-100 border border-[#DCE3EC] px-3 py-2 rounded-xl transition-colors cursor-pointer"
+                title="Volver a la Vista General"
+              >
+                <LayoutGrid className="w-3.5 h-3.5 text-slate-500" />
+                <span>Vista General</span>
+              </button>
+            )}
+
+            <button
+              id="btn-teacher-cerrar-sesion"
+              type="button"
+              onClick={handleTeacherLogout}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-2 rounded-xl transition-colors cursor-pointer"
+              title="Cerrar sesión del docente"
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-600" />
+              <span>Cerrar sesión</span>
+            </button>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-          {activeSection !== 'DASHBOARD' && (
-            <button
-              id="btn-nav-volver-dashboard-docente"
-              type="button"
-              onClick={() => {
-                setActiveSection('DASHBOARD');
-                setSelectedSubjectForStudentsId(null);
-              }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-[#174EAF] hover:text-[#103B88] bg-[#E8F0FC] hover:bg-blue-100 border border-[#DCE3EC] px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Volver al Dashboard</span>
-            </button>
-          )}
+        {/* Modal para que el docente cambie su usuario o contraseña */}
+        {onUpdateDocente && (
+          <TeacherChangeCredentialsModal
+            isOpen={isChangeProfileOpen}
+            onClose={() => setIsChangeProfileOpen(false)}
+            currentDocente={currentTeacher}
+            onUpdateDocente={(updated) => {
+              setCurrentTeacher(updated);
+              try {
+                localStorage.setItem('uagrm_docente_current_teacher', JSON.stringify(updated));
+              } catch {}
+              onUpdateDocente(updated);
+            }}
+          />
+        )}
 
-          <button
-            id="btn-teacher-cerrar-sesion"
-            type="button"
-            onClick={handleTeacherLogout}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#174EAF] hover:text-[#103B88] bg-white hover:bg-[#E8F0FC] border border-[#174EAF] px-3.5 py-2 rounded-xl transition-colors cursor-pointer"
-            title="Cerrar sesión del docente"
-          >
-            <LogOut className="w-3.5 h-3.5 text-[#174EAF]" />
-            <span>Cerrar sesión</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Barra de Navegación Rápida entre Secciones del Portal Docente */}
-      <div className="pt-3 border-t border-[#DCE3EC] flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        {/* Barra de Navegación Rápida entre Secciones del Portal Docente */}
+        <div className="pt-3 border-t border-[#DCE3EC] flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
         <button
           type="button"
           onClick={() => {
@@ -545,6 +656,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
       </div>
     </div>
   );
+};
 
   // ==========================================
   // VIEW 2: DASHBOARD DOCENTE (5 TARJETAS PRINCIPALES)
@@ -555,6 +667,39 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         {/* Top Header */}
         {renderTeacherPortalHeader()}
 
+        {/* Banner para docente nuevo sin asignaturas asignadas (creado limpio) */}
+        {teacherAsignaturas.length === 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-6 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-[#174EAF] text-white flex items-center justify-center mx-auto shadow-xs">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-[#172033]">
+              Bienvenido(a), {currentTeacher?.nombreCompleto || 'Docente'}
+            </h3>
+            <p className="text-xs text-[#667085] max-w-md mx-auto">
+              Tu cuenta se encuentra activa y limpia, sin asignaturas asignadas. Puedes seleccionar materias desde el catálogo oficial o crearlas manualmente.
+            </p>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsSelectOfferOpen(true)}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>🔍 Seleccionar del Catálogo</span>
+              </button>
+              <button
+                type="button"
+                onClick={onOpenAddSubjectModal}
+                className="px-4 py-2 bg-[#174EAF] hover:bg-[#103B88] text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Crear Asignatura</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Resumen Académico Rápido */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-white p-4 rounded-xl border border-[#DCE3EC] shadow-2xs flex items-center justify-between">
@@ -563,9 +708,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 Total Materias
               </p>
               <p className="text-2xl font-black text-[#172033] mt-1">
-                {asignaturas.length}
+                {teacherAsignaturas.length}
               </p>
-              <p className="text-[11px] text-[#667085]">Registradas</p>
+              <p className="text-[11px] text-[#667085]">Asignadas a ti</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-[#E8F0FC] text-[#174EAF] flex items-center justify-center font-bold">
               <Layers className="w-5 h-5" />
@@ -620,7 +765,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
         {/* RESUMEN VISUAL DE RENDIMIENTO GRUPAL CON RECHARTS */}
         <TeacherAttendanceCharts
-          asignaturas={asignaturas}
+          asignaturas={teacherAsignaturas}
           estudiantes={estudiantes}
           registrosAsistencia={registrosAsistencia}
           onNavigateToReport={handleNavigateToReportFromChart}
@@ -820,9 +965,22 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
         {/* COMPONENTE HISTORIAL DE MARCACIONES DENTRO DEL DASHBOARD */}
         <AttendanceMarkingHistory
-          asignaturas={asignaturas}
+          asignaturas={teacherAsignaturas}
           estudiantes={estudiantes}
           registrosAsistencia={registrosAsistencia}
+        />
+
+        <SelectFromOfferModal
+          isOpen={isSelectOfferOpen}
+          onClose={() => setIsSelectOfferOpen(false)}
+          ofertaAcademica={ofertaAcademica}
+          existingAsignaturas={asignaturas}
+          currentDocenteId={currentTeacher?.id}
+          onSelectOfertaItem={(item) => {
+            if (onSelectOfertaItem) {
+              onSelectOfertaItem(item);
+            }
+          }}
         />
       </div>
     );
@@ -849,15 +1007,29 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
               </span>
             </div>
 
-            <button
-              id="btn-crear-asignatura-desde-seccion"
-              type="button"
-              onClick={onOpenAddSubjectModal}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#174EAF] hover:bg-[#103B88] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Crear Asignatura</span>
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                id="btn-seleccionar-de-oferta"
+                type="button"
+                onClick={() => setIsSelectOfferOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                title="Buscar y seleccionar asignaturas desde el Maestro de Oferta Académica"
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>🔍 Seleccionar de Oferta</span>
+              </button>
+
+              <button
+                id="btn-crear-asignatura-desde-seccion"
+                type="button"
+                onClick={onOpenAddSubjectModal}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#174EAF] hover:bg-[#103B88] text-white font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
+                title="Crear una asignatura manualmente desde cero"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ Nueva Asignatura (Manual)</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2 border-t border-[#DCE3EC]">
@@ -991,6 +1163,20 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
             })}
           </div>
         )}
+
+        {/* Modal de selección de oferta académica */}
+        <SelectFromOfferModal
+          isOpen={isSelectOfferOpen}
+          onClose={() => setIsSelectOfferOpen(false)}
+          ofertaAcademica={ofertaAcademica}
+          existingAsignaturas={asignaturas}
+          currentDocenteId={currentTeacher?.id}
+          onSelectOfertaItem={(item) => {
+            if (onSelectOfertaItem) {
+              onSelectOfertaItem(item);
+            }
+          }}
+        />
       </div>
     );
   }
@@ -1029,42 +1215,62 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {asignaturas.map((asig) => {
-              const enrolled = estudiantes.filter((e) => e.asignaturaId === asig.id).length;
-              return (
-                <div
-                  key={asig.id}
-                  onClick={() => setSelectedSubjectForStudentsId(asig.id)}
-                  className="bg-white hover:bg-[#E8F0FC]/40 border border-[#DCE3EC] hover:border-[#174EAF] rounded-xl p-4 cursor-pointer transition-all space-y-2 group shadow-2xs"
+          {teacherAsignaturas.length === 0 ? (
+            <div className="bg-[#F5F7FA] rounded-xl border border-[#DCE3EC] p-8 text-center space-y-3">
+              <BookOpen className="w-10 h-10 text-[#667085]/40 mx-auto" />
+              <p className="text-sm font-bold text-[#172033]">Sin asignaturas para gestionar estudiantes</p>
+              <p className="text-xs text-[#667085] max-w-md mx-auto">
+                Tu cuenta no tiene asignaturas asignadas aún. Primero agrega una materia desde el Catálogo o de forma manual para ver y gestionar la nómina de alumnos.
+              </p>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSelectOfferOpen(true)}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-xs bg-[#174EAF] text-white px-2 py-0.5 rounded">
-                        {asig.sigla}
-                      </span>
-                      <span className="text-xs font-bold text-[#172033] bg-[#E8F0FC] border border-[#DCE3EC] px-2 py-0.5 rounded">
-                        Gr. {asig.grupo}
+                  <Search className="w-3.5 h-3.5" />
+                  <span>🔍 Seleccionar del Catálogo</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {teacherAsignaturas.map((asig) => {
+                const enrolled = estudiantes.filter((e) => e.asignaturaId === asig.id).length;
+                return (
+                  <div
+                    key={asig.id}
+                    onClick={() => setSelectedSubjectForStudentsId(asig.id)}
+                    className="bg-white hover:bg-[#E8F0FC]/40 border border-[#DCE3EC] hover:border-[#174EAF] rounded-xl p-4 cursor-pointer transition-all space-y-2 group shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-xs bg-[#174EAF] text-white px-2 py-0.5 rounded">
+                          {asig.sigla}
+                        </span>
+                        <span className="text-xs font-bold text-[#172033] bg-[#E8F0FC] border border-[#DCE3EC] px-2 py-0.5 rounded">
+                          Gr. {asig.grupo}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-semibold text-[#667085] bg-[#F5F7FA] border border-[#DCE3EC] px-2 py-0.5 rounded">
+                        Sem. {asig.semestre || 1}/{asig.año || 2026}
                       </span>
                     </div>
-                    <span className="text-[11px] font-semibold text-[#667085] bg-[#F5F7FA] border border-[#DCE3EC] px-2 py-0.5 rounded">
-                      Sem. {asig.semestre || 1}/{asig.año || 2026}
-                    </span>
+                    <h4 className="font-bold text-sm text-[#172033] group-hover:text-[#174EAF] transition-colors">
+                      {asig.nombre}
+                    </h4>
+                    <div className="flex items-center justify-between pt-2 border-t border-[#DCE3EC] text-xs">
+                      <span className="text-[#667085] font-medium">{enrolled} estudiantes</span>
+                      <span className="font-bold text-[#174EAF] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
+                        <span>Ver lista</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
                   </div>
-                  <h4 className="font-bold text-sm text-[#172033] group-hover:text-[#174EAF] transition-colors">
-                    {asig.nombre}
-                  </h4>
-                  <div className="flex items-center justify-between pt-2 border-t border-[#DCE3EC] text-xs">
-                    <span className="text-[#667085] font-medium">{enrolled} estudiantes</span>
-                    <span className="font-bold text-[#174EAF] flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                      <span>Ver lista</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1079,7 +1285,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         {renderTeacherPortalHeader('Resumen Visual con Gráficos (Recharts)')}
 
         <TeacherAttendanceCharts
-          asignaturas={asignaturas}
+          asignaturas={teacherAsignaturas}
           estudiantes={estudiantes}
           registrosAsistencia={registrosAsistencia}
           onNavigateToReport={handleNavigateToReportFromChart}
@@ -1097,7 +1303,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         {renderTeacherPortalHeader('3. Habilitar asistencia')}
 
         <AttendanceEnablementManager
-          asignaturas={asignaturas}
+          asignaturas={teacherAsignaturas}
           estudiantes={estudiantes}
           registrosAsistencia={registrosAsistencia}
           sesionesHabilitacion={sesionesHabilitacion}
@@ -1118,14 +1324,14 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
         {/* Resumen Gráfico Recharts incorporado en Reportes */}
         <TeacherAttendanceCharts
-          asignaturas={asignaturas}
+          asignaturas={teacherAsignaturas}
           estudiantes={estudiantes}
           registrosAsistencia={registrosAsistencia}
           onNavigateToReport={(asigId) => setSelectedSubjectForReportsId(asigId)}
         />
 
         <AttendanceReportsView
-          asignaturas={asignaturas}
+          asignaturas={teacherAsignaturas}
           estudiantes={estudiantes}
           registrosAsistencia={registrosAsistencia}
           initialSelectedSubjectId={selectedSubjectForReportsId}
@@ -1143,7 +1349,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         {renderTeacherPortalHeader('5. Calificaciones (Modificación manual e importación)')}
 
         <SubjectGradesView
-          asignaturas={asignaturas}
+          asignaturas={teacherAsignaturas}
           estudiantes={estudiantes}
           notas={notas}
           onSaveGrades={onSaveGrades}
@@ -1161,7 +1367,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         {renderTeacherPortalHeader('6. Historial de marcaciones')}
 
         <AttendanceMarkingHistory
-          asignaturas={asignaturas}
+          asignaturas={teacherAsignaturas}
           estudiantes={estudiantes}
           registrosAsistencia={registrosAsistencia}
         />

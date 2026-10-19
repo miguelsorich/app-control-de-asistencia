@@ -6,11 +6,15 @@ import {
   SesionHabilitacion,
   NotaEstudiante,
   RegistroEnvioCorreo,
+  DocenteUsuario,
+  OfertaAcademicaItem,
 } from './types';
 import { INITIAL_SUBJECTS } from './data/initialSubjects';
 import { INITIAL_STUDENTS } from './data/initialStudents';
 import { INITIAL_ATTENDANCE } from './data/initialAttendance';
 import { INITIAL_GRADES } from './data/initialGrades';
+import { INITIAL_DOCENTES } from './data/initialDocentes';
+import { INITIAL_OFERTA_ACADEMICA } from './data/initialOfertaAcademica';
 import { Header } from './components/Header';
 import { SubjectFormModal } from './components/SubjectFormModal';
 import { DeleteConfirmModal } from './components/DeleteConfirmModal';
@@ -18,6 +22,8 @@ import { ImportStudentsModal } from './components/ImportStudentsModal';
 import { StudentAttendanceView } from './components/StudentAttendanceView';
 import { TeacherPortalView, DocenteSection } from './components/TeacherPortalView';
 import { MainAccessScreen } from './components/MainAccessScreen';
+import { AdminPortalView } from './components/AdminPortalView';
+import { AdminLoginModal } from './components/AdminLoginModal';
 import { getTodayDateString, formatCurrentTimeWithSeconds } from './utils/scheduleValidators';
 import {
   fetchAsignaturasFromSupabase,
@@ -34,7 +40,7 @@ import {
   saveNotasBatchToSupabase,
 } from './services/supabaseSync';
 import { supabase } from './lib/supabase';
-import { CheckCircle2, GraduationCap } from 'lucide-react';
+import { CheckCircle2, GraduationCap, Lock } from 'lucide-react';
 
 const STORAGE_KEY_SUBJECTS = 'uagrm_asistencia_asignaturas_v1';
 const STORAGE_KEY_STUDENTS = 'uagrm_asistencia_estudiantes_v1';
@@ -42,12 +48,65 @@ const STORAGE_KEY_ATTENDANCE = 'uagrm_asistencia_registros_v1';
 const STORAGE_KEY_SESIONES = 'uagrm_asistencia_sesiones_v1';
 const STORAGE_KEY_GRADES = 'uagrm_asistencia_notas_v1';
 const STORAGE_KEY_EMAIL_LOGS = 'uagrm_asistencia_correos_v1';
+const STORAGE_KEY_DOCENTES = 'uagrm_asistencia_docentes_v1';
+const STORAGE_KEY_OFERTA = 'uagrm_asistencia_oferta_v1';
+const STORAGE_KEY_ACTIVE_TEACHER = 'uagrm_docente_current_teacher';
+const STORAGE_KEY_ADMIN_CREDS = 'uagrm_asistencia_admin_creds_v1';
 
 export default function App() {
-  // Primary Navigation State (Por defecto inicia en el Portal Estudiante para que los alumnos solo vean su módulo)
-  const [activeMainTab, setActiveMainTab] = useState<'MAIN' | 'DOCENTE' | 'ESTUDIANTE'>('ESTUDIANTE');
+  // Primary Navigation State: Default to 'MAIN' (Vista General con acceso a Docentes y Estudiantes)
+  const [activeMainTab, setActiveMainTab] = useState<'MAIN' | 'DOCENTE' | 'ESTUDIANTE' | 'ADMIN'>('MAIN');
   const [activeTeacherSection, setActiveTeacherSection] = useState<DocenteSection>('DASHBOARD');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState<boolean>(false);
+
+  // Admin Credentials (default username 'admin', password '0715')
+  const [adminCredentials, setAdminCredentials] = useState<{ username: string; password: string }>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_ADMIN_CREDS);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { username: 'admin', password: '0715' };
+  });
+
+  // Docentes state (Solo datos reales; Lic. Miguel Antonio Sorich Rojas y docentes creados por el admin)
+  const [docentes, setDocentes] = useState<DocenteUsuario[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_DOCENTES);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Filtrar cualquier docente ficticio de pruebas anteriores
+          const cleaned = parsed.filter(
+            (d) =>
+              d.id === 'docente-6379' ||
+              (!d.id.includes('test') && !d.nombreCompleto.toLowerCase().includes('ficticio'))
+          );
+          if (!cleaned.some((d) => d.id === 'docente-6379')) {
+            cleaned.unshift(INITIAL_DOCENTES[0]);
+          }
+          return cleaned;
+        }
+      }
+    } catch (e) {
+      console.warn('Error loading docentes:', e);
+    }
+    return INITIAL_DOCENTES;
+  });
+
+  // Oferta Académica state (Maestro de oferta)
+  const [ofertaAcademica, setOfertaAcademica] = useState<OfertaAcademicaItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_OFERTA);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Error loading oferta:', e);
+    }
+    return INITIAL_OFERTA_ACADEMICA;
+  });
+
+  // Currently logged-in Teacher: Null by default so every teacher (including Lic. Miguel Antonio Sorich Rojas) must enter their credentials
+  const [currentDocente, setCurrentDocente] = useState<DocenteUsuario | null>(null);
 
   // Referencias para el activador secreto de 3 clics en el pie de página
   const footerClickCountRef = React.useRef<number>(0);
@@ -87,50 +146,85 @@ export default function App() {
     }
   };
 
-  // Subjects State (Módulo 1)
+  // Subjects State (Módulo 1): Las 4 asignaturas de Lic. Miguel Antonio Sorich Rojas + asignaturas de otros docentes
   const [asignaturas, setAsignaturas] = useState<Asignatura[]>(() => {
+    const map = new Map<string, Asignatura>();
+    // Siempre asegurar las 4 materias del Lic. Miguel Antonio Sorich Rojas
+    INITIAL_SUBJECTS.forEach((initSub) => {
+      map.set(initSub.id, {
+        ...initSub,
+        docenteId: 'docente-6379',
+        docenteNombre: 'Lic. Miguel Antonio Sorich Rojas',
+      });
+    });
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY_SUBJECTS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.map((item) => ({
-            ...item,
-            semestre: item.semestre === 2 ? 2 : 1,
-            año: item.año ? Number(item.año) : (item.anio ? Number(item.anio) : 2026),
-          }));
+          parsed.forEach((item: Asignatura) => {
+            if (item && item.id) {
+              const isInitialMiguel = INITIAL_SUBJECTS.some((s) => s.id === item.id);
+              map.set(item.id, {
+                ...item,
+                semestre: item.semestre === 2 ? 2 : 1,
+                año: item.año ? Number(item.año) : ((item as any).anio ? Number((item as any).anio) : 2026),
+                docenteId: item.docenteId || (isInitialMiguel ? 'docente-6379' : undefined),
+                docenteNombre: item.docenteNombre || (isInitialMiguel ? 'Lic. Miguel Antonio Sorich Rojas' : undefined),
+              });
+            }
+          });
         }
       }
     } catch (e) {
       console.error('Error loading subjects from localStorage:', e);
     }
-    return INITIAL_SUBJECTS;
+    return Array.from(map.values());
   });
 
-  // Students State (Módulo 2)
+  // Students State (Módulo 2): Nómina oficial asegurada para las asignaturas
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>(() => {
+    const map = new Map<string, Estudiante>();
+    INITIAL_STUDENTS.forEach((e) => map.set(e.id, e));
     try {
       const saved = localStorage.getItem(STORAGE_KEY_STUDENTS);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((e: Estudiante) => {
+            if (e && e.id) map.set(e.id, e);
+          });
+        }
       }
     } catch (e) {
       console.error('Error loading students from localStorage:', e);
     }
-    return INITIAL_STUDENTS;
+    return Array.from(map.values());
   });
 
-  // Attendance Records State (Módulo 3)
+  // Attendance Records State (Módulo 3): Recuperación y conservación permanente de asistencias de Lic. Miguel Antonio Sorich Rojas
   const [registrosAsistencia, setRegistrosAsistencia] = useState<RegistroAsistencia[]>(() => {
+    const map = new Map<string, RegistroAsistencia>();
+    // Recuperar todos los registros de asistencia oficiales
+    INITIAL_ATTENDANCE.forEach((r) => map.set(r.id, r));
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY_ATTENDANCE);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((r: RegistroAsistencia) => {
+            if (r && r.id) {
+              map.set(r.id, r);
+            }
+          });
+        }
       }
     } catch (e) {
       console.error('Error loading attendance records from localStorage:', e);
     }
-    return INITIAL_ATTENDANCE;
+    return Array.from(map.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
   });
 
   // Attendance Enablement Sessions State (Módulo 4)
@@ -148,17 +242,28 @@ export default function App() {
     return {};
   });
 
-  // Grades State (Módulo 6)
+  // Grades State (Módulo 6): Recuperación y conservación permanente de notas de Lic. Miguel Antonio Sorich Rojas
   const [notas, setNotas] = useState<NotaEstudiante[]>(() => {
+    const map = new Map<string, NotaEstudiante>();
+    // Recuperar todas las calificaciones oficiales
+    INITIAL_GRADES.forEach((n) => map.set(n.id, n));
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY_GRADES);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((n: NotaEstudiante) => {
+            if (n && n.id) {
+              map.set(n.id, n);
+            }
+          });
+        }
       }
     } catch (e) {
       console.error('Error loading grades from localStorage:', e);
     }
-    return INITIAL_GRADES;
+    return Array.from(map.values());
   });
 
   // Subject Modal State
@@ -204,8 +309,8 @@ export default function App() {
 
       if (remoteAsis && remoteAsis.length > 0) {
         setRegistrosAsistencia((prevLocal) => {
-          // Fusionar registros remotos (con paginación completa) y registros locales sin perder ningún registro
           const map = new Map<string, RegistroAsistencia>();
+          INITIAL_ATTENDANCE.forEach((r) => map.set(r.id, r));
           remoteAsis.forEach((r) => map.set(r.id, r));
           const unsynced: RegistroAsistencia[] = [];
           prevLocal.forEach((r) => {
@@ -221,10 +326,14 @@ export default function App() {
         });
       } else {
         setRegistrosAsistencia((prevLocal) => {
-          if (prevLocal.length > 0) {
-            saveAsistenciasBatchToSupabase(prevLocal);
+          const map = new Map<string, RegistroAsistencia>();
+          INITIAL_ATTENDANCE.forEach((r) => map.set(r.id, r));
+          prevLocal.forEach((r) => map.set(r.id, r));
+          const list = Array.from(map.values());
+          if (list.length > 0) {
+            saveAsistenciasBatchToSupabase(list);
           }
-          return prevLocal;
+          return list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         });
       }
 
@@ -233,9 +342,33 @@ export default function App() {
       }
 
       if (remoteNot && remoteNot.length > 0) {
-        setNotas(remoteNot);
+        setNotas((prevLocal) => {
+          const map = new Map<string, NotaEstudiante>();
+          INITIAL_GRADES.forEach((n) => map.set(n.id, n));
+          remoteNot.forEach((n) => map.set(n.id, n));
+          const unsynced: NotaEstudiante[] = [];
+          prevLocal.forEach((n) => {
+            if (!map.has(n.id)) {
+              map.set(n.id, n);
+              unsynced.push(n);
+            }
+          });
+          if (unsynced.length > 0) {
+            saveNotasBatchToSupabase(unsynced);
+          }
+          return Array.from(map.values());
+        });
       } else {
-        saveNotasBatchToSupabase(notas);
+        setNotas((prevLocal) => {
+          const map = new Map<string, NotaEstudiante>();
+          INITIAL_GRADES.forEach((n) => map.set(n.id, n));
+          prevLocal.forEach((n) => map.set(n.id, n));
+          const list = Array.from(map.values());
+          if (list.length > 0) {
+            saveNotasBatchToSupabase(list);
+          }
+          return list;
+        });
       }
     } catch (e) {
       console.warn('[Supabase] Initial sync info:', e);
@@ -402,11 +535,134 @@ export default function App() {
     }
   }, [notas]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_DOCENTES, JSON.stringify(docentes));
+    } catch (e) {
+      console.error('Error saving docentes to localStorage:', e);
+    }
+  }, [docentes]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_OFERTA, JSON.stringify(ofertaAcademica));
+    } catch (e) {
+      console.error('Error saving oferta to localStorage:', e);
+    }
+  }, [ofertaAcademica]);
+
+  useEffect(() => {
+    try {
+      if (currentDocente) {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_TEACHER, JSON.stringify(currentDocente));
+      } else {
+        localStorage.removeItem(STORAGE_KEY_ACTIVE_TEACHER);
+      }
+    } catch (e) {
+      console.error('Error saving currentDocente:', e);
+    }
+  }, [currentDocente]);
+
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => {
       setToastMessage((prev) => (prev === message ? null : prev));
     }, 4000);
+  };
+
+  // ==========================================
+  // ADMIN & OFERTA HANDLERS
+  // ==========================================
+  const handleOpenAdminLogin = () => {
+    setIsAdminLoginOpen(true);
+  };
+
+  const handleAdminLoginSuccess = () => {
+    setIsAdminLoginOpen(false);
+    setActiveMainTab('ADMIN');
+    showToast('Acceso Propietario / Administrador habilitado.');
+  };
+
+  const handleUpdateAdminCredentials = (newCreds: { username: string; password: string }) => {
+    setAdminCredentials(newCreds);
+    try {
+      localStorage.setItem(STORAGE_KEY_ADMIN_CREDS, JSON.stringify(newCreds));
+    } catch (e) {
+      console.warn('Error saving admin creds', e);
+    }
+    showToast('Credenciales de Administrador actualizadas con éxito.');
+  };
+
+  const handleSaveDocente = (newDoc: DocenteUsuario) => {
+    setDocentes((prev) => [newDoc, ...prev]);
+    showToast(`Docente "${newDoc.nombreCompleto}" registrado con éxito.`);
+  };
+
+  const handleUpdateDocente = (updatedDoc: DocenteUsuario) => {
+    setDocentes((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
+    if (currentDocente?.id === updatedDoc.id) {
+      setCurrentDocente(updatedDoc);
+    }
+    showToast(`Credenciales del docente "${updatedDoc.nombreCompleto}" actualizadas.`);
+  };
+
+  const handleDeleteDocente = (docenteId: string) => {
+    setDocentes((prev) => prev.filter((d) => d.id !== docenteId));
+    showToast('Docente eliminado del sistema.');
+  };
+
+  const handleSaveOfertaItem = (newItem: OfertaAcademicaItem) => {
+    setOfertaAcademica((prev) => [newItem, ...prev]);
+    showToast(`Materia "${newItem.sigla} - ${newItem.nombre}" agregada al Maestro de Oferta.`);
+  };
+
+  const handleUpdateOfertaItem = (updatedItem: OfertaAcademicaItem) => {
+    setOfertaAcademica((prev) => prev.map((o) => (o.id === updatedItem.id ? updatedItem : o)));
+    showToast(`Materia "${updatedItem.sigla} - ${updatedItem.nombre}" actualizada en la oferta.`);
+  };
+
+  const handleImportOfertaItems = (items: OfertaAcademicaItem[]) => {
+    setOfertaAcademica((prev) => [...items, ...prev]);
+    showToast(`${items.length} asignaturas importadas al Maestro de Oferta.`);
+  };
+
+  const handleDeleteOfertaItem = (itemId: string) => {
+    setOfertaAcademica((prev) => prev.filter((o) => o.id !== itemId));
+    showToast('Asignatura retirada de la oferta académica.');
+  };
+
+  const handleResetOfertaDefault = () => {
+    setOfertaAcademica(INITIAL_OFERTA_ACADEMICA);
+    showToast('Oferta académica restablecida con el catálogo oficial UAGRM.');
+  };
+
+  // When a teacher selects a subject from the academic offer catalog
+  const handleSelectOfertaItem = (item: OfertaAcademicaItem) => {
+    const teacherId = currentDocente?.id || 'docente-6379';
+    const teacherName = currentDocente?.nombreCompleto || 'Lic. Miguel Antonio Sorich Rojas';
+
+    const newSubject: Asignatura = {
+      id: `asig-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      sigla: item.sigla,
+      nombre: item.nombre,
+      grupo: item.grupo,
+      semestre: item.semestre,
+      año: item.año || 2026,
+      modalidad: item.modalidad,
+      horaInicio: item.horaInicio,
+      horaFin: item.horaFin,
+      aula: item.aula,
+      colorTag: item.colorTag || '#174EAF',
+      fechaCreacion: Date.now(),
+      docenteId: teacherId,
+      docenteNombre: teacherName,
+      origenOfertaId: item.id,
+      carrera: item.carrera,
+    };
+
+    setAsignaturas((prev) => [newSubject, ...prev]);
+    saveAsignaturaToSupabase(newSubject);
+    showToast(`Asignatura "${item.sigla} (${item.grupo})" incorporada exitosamente a tu portal docente.`);
   };
 
   // Subject Actions (Módulo 1)
@@ -443,14 +699,19 @@ export default function App() {
       showToast(`Asignatura "${data.sigla} - ${data.nombre}" guardada correctamente.`);
     } else {
       const newId = `asig-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+      const teacherId = currentDocente?.id || 'docente-6379';
+      const teacherName = currentDocente?.nombreCompleto || 'Lic. Miguel Antonio Sorich Rojas';
+
       const newSubject: Asignatura = {
         id: newId,
         ...data,
+        docenteId: teacherId,
+        docenteNombre: teacherName,
         fechaCreacion: Date.now(),
       };
       setAsignaturas((prev) => [newSubject, ...prev]);
       saveAsignaturaToSupabase(newSubject);
-      showToast(`Asignatura "${data.sigla} - ${data.nombre}" agregada correctamente.`);
+      showToast(`Asignatura "${data.sigla} - ${data.nombre}" creada manualmente.`);
     }
   };
 
@@ -597,15 +858,38 @@ export default function App() {
         onNavigateHome={() => setActiveMainTab('ESTUDIANTE')}
         onUnlockDocente={handleUnlockDocente}
         onOpenDocenteGraficos={handleOpenDocenteGraficos}
+        onOpenAdminLogin={handleOpenAdminLogin}
       />
 
-      {/* Main Content Area: El estudiante solo ve el Portal Estudiante directamente */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {activeMainTab === 'DOCENTE' ? (
+        {activeMainTab === 'ADMIN' ? (
           /* ==========================================
-             PORTAL DOCENTE / ADMINISTRADOR (MÓDULO 9)
-             Acceso Docente: Miguel Antonio Sorich Rojas (6379)
-             Solo accesible mediante 3 clics en el logo del encabezado o en el pie de página
+             PANEL DE ADMINISTRADOR PROPIETARIO
+             Gestión centralizada de docentes, oferta y supervisión
+             ========================================== */
+          <AdminPortalView
+            docentes={docentes}
+            onSaveDocente={handleSaveDocente}
+            onUpdateDocente={handleUpdateDocente}
+            onDeleteDocente={handleDeleteDocente}
+            ofertaAcademica={ofertaAcademica}
+            onSaveOfertaItem={handleSaveOfertaItem}
+            onUpdateOfertaItem={handleUpdateOfertaItem}
+            onImportOfertaItems={handleImportOfertaItems}
+            onDeleteOfertaItem={handleDeleteOfertaItem}
+            onResetOfertaDefault={handleResetOfertaDefault}
+            asignaturas={asignaturas}
+            estudiantes={estudiantes}
+            registrosAsistencia={registrosAsistencia}
+            adminCredentials={adminCredentials}
+            onUpdateAdminCredentials={handleUpdateAdminCredentials}
+            onExitAdmin={() => setActiveMainTab('MAIN')}
+          />
+        ) : activeMainTab === 'DOCENTE' ? (
+          /* ==========================================
+             PORTAL DOCENTE (MÓDULO 9)
+             Acceso para docentes con sus asignaturas y gestión
              ========================================== */
           <TeacherPortalView
             asignaturas={asignaturas}
@@ -613,6 +897,13 @@ export default function App() {
             registrosAsistencia={registrosAsistencia}
             sesionesHabilitacion={sesionesHabilitacion}
             notas={notas}
+            docentes={docentes}
+            ofertaAcademica={ofertaAcademica}
+            currentDocente={currentDocente}
+            onLoginDocente={setCurrentDocente}
+            onLogoutDocente={() => setCurrentDocente(null)}
+            onUpdateDocente={handleUpdateDocente}
+            onSelectOfertaItem={handleSelectOfertaItem}
             initialSection={activeTeacherSection}
             onSectionChange={(sec) => setActiveTeacherSection(sec)}
             onOpenAddSubjectModal={handleOpenAddModal}
@@ -623,13 +914,12 @@ export default function App() {
             onHabilitarAsistencia={handleHabilitarAsistencia}
             onCerrarAsistencia={handleCerrarAsistencia}
             onSaveGrades={handleSaveGrades}
-            onVolverPrincipal={() => setActiveMainTab('ESTUDIANTE')}
-            onLogoutToMain={() => setActiveMainTab('ESTUDIANTE')}
+            onVolverPrincipal={() => setActiveMainTab('MAIN')}
+            onLogoutToMain={() => setActiveMainTab('MAIN')}
           />
-        ) : (
+        ) : activeMainTab === 'ESTUDIANTE' ? (
           /* ==========================================
              PORTAL DEL ESTUDIANTE (MÓDULOS 3, 6 Y 8)
-             Vista principal y única visible para los estudiantes
              ========================================== */
           <StudentAttendanceView
             asignaturas={asignaturas}
@@ -638,14 +928,32 @@ export default function App() {
             sesionesHabilitacion={sesionesHabilitacion}
             notas={notas}
             onRegistrarAsistencia={handleRegistrarAsistencia}
-            onVolverPrincipal={() => setActiveMainTab('ESTUDIANTE')}
-            onVolverDocente={() => setActiveMainTab('ESTUDIANTE')}
-            onLogoutToMain={() => setActiveMainTab('ESTUDIANTE')}
+            onVolverPrincipal={() => setActiveMainTab('MAIN')}
+            onVolverDocente={() => {
+              setActiveMainTab('DOCENTE');
+              setActiveTeacherSection('DASHBOARD');
+            }}
+            onLogoutToMain={() => setActiveMainTab('MAIN')}
+          />
+        ) : (
+          /* ==========================================
+             VISTA GENERAL (MAIN ACCESS SCREEN)
+             Acceso a Docentes y Acceso a Estudiantes
+             ========================================== */
+          <MainAccessScreen
+            onSelectEstudiante={() => setActiveMainTab('ESTUDIANTE')}
+            onSelectDocente={() => {
+              setActiveMainTab('DOCENTE');
+              setActiveTeacherSection('DASHBOARD');
+            }}
+            totalAsignaturas={asignaturas.length}
+            totalEstudiantes={estudiantes.length}
+            onOpenAdminLogin={handleOpenAdminLogin}
           />
         )}
       </main>
 
-      {/* Footer con zona secundaria de 3 clics para el administrador */}
+      {/* Footer con zona discreta de candado para el administrador */}
       <footer className="bg-white border-t border-[#DCE3EC] py-4 mt-12 text-center text-xs text-[#667085]">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-[#172033] font-medium">
@@ -666,15 +974,37 @@ export default function App() {
             </div>
             <span>Control de Asistencia UAGRM — Digital Academy</span>
           </div>
-          <p
-            onClick={handleSecretFooterClick}
-            className="text-[#667085] text-[11px] select-none cursor-default"
-            title="Facultad de Ciencias Contables UAGRM"
-          >
-            Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas • Docente: Miguel Antonio Sorich Rojas (Cód. 6379)
-          </p>
+
+          <div className="flex items-center gap-2.5">
+            <p
+              onClick={handleSecretFooterClick}
+              className="text-[#667085] text-[11px] select-none cursor-default"
+              title="Facultad de Ciencias Contables UAGRM"
+            >
+              Facultad de Ciencias Contables, Auditoría, Sistemas de Control de Gestión y Finanzas
+            </p>
+
+            {/* Ícono de Candado discreto en el pie de página */}
+            <button
+              id="btn-footer-admin-candado"
+              type="button"
+              onClick={handleOpenAdminLogin}
+              className="p-1 rounded text-slate-400 hover:text-amber-500 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Acceso de Gestión con Clave"
+            >
+              <Lock className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </footer>
+
+      {/* Admin Login Modal (Protegido con clave configurable de administrador) */}
+      <AdminLoginModal
+        isOpen={isAdminLoginOpen}
+        onClose={() => setIsAdminLoginOpen(false)}
+        onSuccess={handleAdminLoginSuccess}
+        adminPassword={adminCredentials.password}
+      />
 
       {/* Form Modal (Add / Edit Subject) */}
       <SubjectFormModal

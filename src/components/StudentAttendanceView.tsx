@@ -362,6 +362,16 @@ export const StudentAttendanceView: React.FC<StudentAttendanceViewProps> = ({
               <span>Ingresar al Portal</span>
               <ChevronRight className="w-4 h-4" />
             </button>
+
+            {onVolverPrincipal && (
+              <button
+                type="button"
+                onClick={onVolverPrincipal}
+                className="w-full py-2.5 px-4 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs rounded-xl border border-slate-200 transition-colors cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>Volver a la Vista General</span>
+              </button>
+            )}
           </form>
 
           {/* Academic Footer Reassurance */}

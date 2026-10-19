@@ -55,6 +55,39 @@ export interface Asignatura {
   aula?: string; // opcional para mayor claridad
   colorTag?: string; // color temático sutil para identificar la materia
   fechaCreacion: number;
+  docenteId?: string; // ID del docente asignado
+  docenteNombre?: string; // Nombre del docente que imparte la materia
+  origenOfertaId?: string; // Si proviene del catálogo de oferta académica
+  carrera?: string; // Carrera correspondiente
+}
+
+export interface DocenteUsuario {
+  id: string;
+  codigoDocente: string; // Usuario o código de acceso (ej. "6379", "cpa_rodriguez")
+  nombreCompleto: string;
+  correo: string;
+  contrasena: string;
+  telefono?: string;
+  carrera?: string;
+  activo: boolean;
+  fechaCreacion: number;
+}
+
+export interface OfertaAcademicaItem {
+  id: string;
+  sigla: string; // ej. "CPA-100", "ADM-101"
+  nombre: string; // ej. "CONTABILIDAD BÁSICA I"
+  grupo: string; // ej. "G1", "SA"
+  semestre: SemestreAsignatura; // 1 o 2
+  año: number;
+  carrera: string; // ej. "Contaduría Pública", "Auditoría Financiera", "Finanzas"
+  modalidad: ModalidadSemanal;
+  horaInicio: string; // "07:00"
+  horaFin: string; // "08:30"
+  aula?: string;
+  colorTag?: string;
+  docenteAsignadoId?: string;
+  docenteAsignadoNombre?: string;
 }
 
 export interface Estudiante {
