@@ -246,7 +246,7 @@ export const AttendanceMarkingHistory: React.FC<AttendanceMarkingHistoryProps> =
                   Historial de Marcaciones
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC]">
-                  Auditoría Global
+                  Mis Asignaturas
                 </span>
                 {duplicateRecordsCount > 0 ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
@@ -261,7 +261,7 @@ export const AttendanceMarkingHistory: React.FC<AttendanceMarkingHistoryProps> =
                 )}
               </div>
               <p className="text-xs text-[#667085] mt-1 leading-relaxed">
-                Muestra los registros de asistencia globales en orden cronológico inverso para identificar inconsistencias, duplicados o verificar marcaciones en tiempo real.
+                Muestra las marcaciones de asistencia de los estudiantes inscritos en tus asignaturas en orden cronológico inverso para auditoría y verificación en tiempo real.
               </p>
             </div>
           </div>
@@ -395,22 +395,50 @@ export const AttendanceMarkingHistory: React.FC<AttendanceMarkingHistoryProps> =
               <tr>
                 <td colSpan={7} className="py-12 text-center text-[#667085]">
                   <div className="max-w-xs mx-auto space-y-2">
-                    <div className="w-10 h-10 rounded-full bg-[#E8F0FC] text-[#174EAF] flex items-center justify-center mx-auto">
-                      <Search className="w-5 h-5" />
-                    </div>
-                    <p className="font-bold text-sm text-[#172033]">
-                      No se encontraron registros
-                    </p>
-                    <p className="text-xs text-[#667085]">
-                      No hay registros que coincidan con los filtros aplicados.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleResetFilters}
-                      className="mt-2 text-xs font-bold text-[#174EAF] hover:underline cursor-pointer"
-                    >
-                      Restablecer filtros
-                    </button>
+                    {asignaturas.length === 0 ? (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-[#E8F0FC] text-[#174EAF] flex items-center justify-center mx-auto">
+                          <BookOpen className="w-5 h-5" />
+                        </div>
+                        <p className="font-bold text-sm text-[#172033]">
+                          Sin asignaturas asignadas
+                        </p>
+                        <p className="text-xs text-[#667085]">
+                          Tu cuenta aún no tiene asignaturas asignadas. Agrega o selecciona materias para comenzar a registrar la asistencia de tus alumnos.
+                        </p>
+                      </>
+                    ) : registrosAsistencia.length === 0 ? (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-[#E8F0FC] text-[#174EAF] flex items-center justify-center mx-auto">
+                          <Calendar className="w-5 h-5" />
+                        </div>
+                        <p className="font-bold text-sm text-[#172033]">
+                          Sin marcaciones registradas
+                        </p>
+                        <p className="text-xs text-[#667085]">
+                          Aún no existen marcaciones de asistencia de estudiantes registradas para tus asignaturas.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="w-10 h-10 rounded-full bg-[#E8F0FC] text-[#174EAF] flex items-center justify-center mx-auto">
+                          <Search className="w-5 h-5" />
+                        </div>
+                        <p className="font-bold text-sm text-[#172033]">
+                          No se encontraron registros
+                        </p>
+                        <p className="text-xs text-[#667085]">
+                          No hay registros que coincidan con los filtros aplicados.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleResetFilters}
+                          className="mt-2 text-xs font-bold text-[#174EAF] hover:underline cursor-pointer"
+                        >
+                          Restablecer filtros
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -547,7 +575,7 @@ export const AttendanceMarkingHistory: React.FC<AttendanceMarkingHistoryProps> =
         <div className="text-[#667085] flex items-center gap-2">
           <span>
             Mostrando <strong>{totalRecords === 0 ? 0 : startIndex + 1}</strong> a{' '}
-            <strong>{endIndex}</strong> de <strong>{totalRecords.toLocaleString()}</strong> registros globales
+            <strong>{endIndex}</strong> de <strong>{totalRecords.toLocaleString()}</strong> registros de tus asignaturas
           </span>
           {onlyDuplicates && (
             <span className="text-amber-700 font-bold bg-amber-100 px-2 py-0.5 rounded text-[10px]">

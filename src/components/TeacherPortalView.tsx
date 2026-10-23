@@ -243,6 +243,39 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
     });
   }, [asignaturas, currentTeacher]);
 
+  // IDs de las asignaturas pertenecientes al docente actual
+  const teacherAsignaturaIds = useMemo(() => {
+    return new Set(teacherAsignaturas.map((a) => a.id));
+  }, [teacherAsignaturas]);
+
+  // Estudiantes que cursan las asignaturas del docente actual (no de otros docentes)
+  const teacherEstudiantes = useMemo(() => {
+    return estudiantes.filter((e) => teacherAsignaturaIds.has(e.asignaturaId));
+  }, [estudiantes, teacherAsignaturaIds]);
+
+  // Historial de marcaciones de asistencia exclusivamente del docente actual (sus asignaturas y estudiantes)
+  // Un docente nuevo o cualquier docente nunca verá las marcaciones de materias de otros docentes
+  const teacherRegistrosAsistencia = useMemo(() => {
+    return registrosAsistencia.filter((r) => teacherAsignaturaIds.has(r.asignaturaId));
+  }, [registrosAsistencia, teacherAsignaturaIds]);
+
+  // Calificaciones de las materias del docente actual
+  const teacherNotas = useMemo(() => {
+    return notas.filter((n) => teacherAsignaturaIds.has(n.asignaturaId));
+  }, [notas, teacherAsignaturaIds]);
+
+  // Sesiones de habilitación exclusivas para las asignaturas del docente actual
+  const teacherSesionesHabilitacion = useMemo(() => {
+    const res: Record<string, SesionHabilitacion> = {};
+    if (!sesionesHabilitacion) return res;
+    for (const asigId of teacherAsignaturaIds) {
+      if (sesionesHabilitacion[asigId]) {
+        res[asigId] = sesionesHabilitacion[asigId];
+      }
+    }
+    return res;
+  }, [sesionesHabilitacion, teacherAsignaturaIds]);
+
   // Filtered subjects for Section 1 (Gestión de Asignaturas)
   const filteredAsignaturas = useMemo(() => {
     return teacherAsignaturas.filter((asig) => {
@@ -766,8 +799,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         {/* RESUMEN VISUAL DE RENDIMIENTO GRUPAL CON RECHARTS */}
         <TeacherAttendanceCharts
           asignaturas={teacherAsignaturas}
-          estudiantes={estudiantes}
-          registrosAsistencia={registrosAsistencia}
+          estudiantes={teacherEstudiantes}
+          registrosAsistencia={teacherRegistrosAsistencia}
           onNavigateToReport={handleNavigateToReportFromChart}
         />
 
@@ -951,7 +984,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                     6. Historial de marcaciones
                   </h4>
                   <p className="text-xs text-[#667085] mt-1.5 leading-relaxed">
-                    Auditoría en tiempo real, tabla paginada con los últimos registros de asistencia globales y detección de duplicados.
+                    Auditoría en tiempo real, tabla paginada con los registros de asistencia exclusivos de tus estudiantes y detección de duplicados.
                   </p>
                 </div>
               </div>
@@ -1286,8 +1319,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
         <TeacherAttendanceCharts
           asignaturas={teacherAsignaturas}
-          estudiantes={estudiantes}
-          registrosAsistencia={registrosAsistencia}
+          estudiantes={teacherEstudiantes}
+          registrosAsistencia={teacherRegistrosAsistencia}
           onNavigateToReport={handleNavigateToReportFromChart}
         />
       </div>
@@ -1304,9 +1337,9 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
         <AttendanceEnablementManager
           asignaturas={teacherAsignaturas}
-          estudiantes={estudiantes}
-          registrosAsistencia={registrosAsistencia}
-          sesionesHabilitacion={sesionesHabilitacion}
+          estudiantes={teacherEstudiantes}
+          registrosAsistencia={teacherRegistrosAsistencia}
+          sesionesHabilitacion={teacherSesionesHabilitacion}
           onHabilitarAsistencia={onHabilitarAsistencia}
           onCerrarAsistencia={onCerrarAsistencia}
         />
@@ -1325,15 +1358,15 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
         {/* Resumen Gráfico Recharts incorporado en Reportes */}
         <TeacherAttendanceCharts
           asignaturas={teacherAsignaturas}
-          estudiantes={estudiantes}
-          registrosAsistencia={registrosAsistencia}
+          estudiantes={teacherEstudiantes}
+          registrosAsistencia={teacherRegistrosAsistencia}
           onNavigateToReport={(asigId) => setSelectedSubjectForReportsId(asigId)}
         />
 
         <AttendanceReportsView
           asignaturas={teacherAsignaturas}
-          estudiantes={estudiantes}
-          registrosAsistencia={registrosAsistencia}
+          estudiantes={teacherEstudiantes}
+          registrosAsistencia={teacherRegistrosAsistencia}
           initialSelectedSubjectId={selectedSubjectForReportsId}
         />
       </div>
@@ -1350,8 +1383,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
         <SubjectGradesView
           asignaturas={teacherAsignaturas}
-          estudiantes={estudiantes}
-          notas={notas}
+          estudiantes={teacherEstudiantes}
+          notas={teacherNotas}
           onSaveGrades={onSaveGrades}
         />
       </div>
@@ -1359,7 +1392,7 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   }
 
   // ==========================================
-  // SECTION 6: HISTORIAL DE MARCACIONES (AUDITORÍA GLOBAL)
+  // SECTION 6: HISTORIAL DE MARCACIONES (AUDITORÍA DOCENTE)
   // ==========================================
   if (activeSection === 'HISTORIAL') {
     return (
@@ -1368,8 +1401,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
 
         <AttendanceMarkingHistory
           asignaturas={teacherAsignaturas}
-          estudiantes={estudiantes}
-          registrosAsistencia={registrosAsistencia}
+          estudiantes={teacherEstudiantes}
+          registrosAsistencia={teacherRegistrosAsistencia}
         />
       </div>
     );
