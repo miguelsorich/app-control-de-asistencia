@@ -226,43 +226,57 @@ export const SelectFromOfferModal: React.FC<SelectFromOfferModalProps> = ({
                           <span className="px-2 py-0.5 rounded-md text-xs font-black bg-[#E8F0FC] text-[#174EAF] border border-blue-200">
                             {item.sigla}
                           </span>
-                          <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-700">
-                            Grupo {item.grupo}
+                          <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-800">
+                            Grp: {item.grupo}
                           </span>
-                          <span className="text-[11px] font-medium text-slate-500">
-                            Semestre {item.semestre} • {item.año}
+                          <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                            NSA: {item.nsa ?? item.semestre}
                           </span>
+                          {item.cupoOfertado !== undefined && (
+                            <span className="text-[11px] font-mono text-slate-600 bg-blue-50/60 border border-blue-100 px-1.5 py-0.5 rounded">
+                              Cupo: {item.cupoOfertado} (Insc: {item.inscritos ?? 0})
+                            </span>
+                          )}
                         </div>
                         <h4 className="text-sm font-bold text-slate-900 leading-snug">
                           {item.nombre}
                         </h4>
-                        <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                          <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{item.carrera || 'Facultad de Ciencias Contables'}</span>
-                        </p>
+                        <div className="flex flex-col gap-0.5 text-[11px] text-slate-500">
+                          <p className="flex items-center gap-1">
+                            <GraduationCap className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <span>Carreras: {item.carrera || 'Facultad de Ciencias Contables'}</span>
+                          </p>
+                          {item.docenteAsignadoNombre && (
+                            <p className="text-slate-600 font-medium">
+                              Docente: {item.docenteAsignadoNombre}
+                              {item.docenteAsignadoId && <span className="font-mono text-slate-400 ml-1">({item.docenteAsignadoId})</span>}
+                            </p>
+                          )}
+                        </div>
                       </div>
 
                       {/* Modalidad Pill */}
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                        {item.modalidad === 'LUN_MIE_VIE'
-                          ? 'Lun-Mié-Vie'
-                          : item.modalidad === 'MAR_JUE'
-                          ? 'Mar-Jue'
-                          : 'Sábado'}
+                        {item.diasTexto ||
+                          (item.modalidad === 'LUN_MIE_VIE'
+                            ? 'Lun, Mié, Vie'
+                            : item.modalidad === 'MAR_JUE'
+                            ? 'Mar, Jue'
+                            : 'Sábado')}
                       </span>
                     </div>
 
                     {/* Schedule & Classroom Details */}
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600 flex-wrap gap-2">
                       <div className="flex items-center gap-3 text-[11px]">
-                        <span className="flex items-center gap-1">
+                        <span className="flex items-center gap-1 font-mono">
                           <Clock className="w-3 h-3 text-slate-400" />
-                          {item.horaInicio} - {item.horaFin}
+                          {item.horarioTexto || `${item.horaInicio} - ${item.horaFin}`}
                         </span>
                         {item.aula && (
-                          <span className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 font-semibold text-slate-700">
                             <MapPin className="w-3 h-3 text-slate-400" />
-                            {item.aula}
+                            Aula: {item.aula}
                           </span>
                         )}
                       </div>

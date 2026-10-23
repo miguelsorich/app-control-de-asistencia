@@ -22,6 +22,13 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
   const [horaInicio, setHoraInicio] = useState('07:00');
   const [horaFin, setHoraFin] = useState('08:30');
   const [aula, setAula] = useState('Aula 236-01');
+  const [cupoOfertado, setCupoOfertado] = useState<number | undefined>(40);
+  const [inscritos, setInscritos] = useState<number | undefined>(0);
+  const [nsa, setNsa] = useState<string | number>(1);
+  const [docenteId, setDocenteId] = useState('');
+  const [docenteNombre, setDocenteNombre] = useState('');
+  const [diasTexto, setDiasTexto] = useState('Lun');
+  const [horarioTexto, setHorarioTexto] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -29,7 +36,7 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!sigla.trim()) {
-      setError('La sigla / código es obligatoria (ej. CPA-100).');
+      setError('La sigla / código es obligatoria (ej. ADM100).');
       return;
     }
     if (!nombre.trim()) {
@@ -41,7 +48,7 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
       id: `oferta-${Date.now()}`,
       sigla: sigla.trim().toUpperCase(),
       nombre: nombre.trim(),
-      grupo: grupo.trim().toUpperCase() || 'G1',
+      grupo: grupo.trim().toUpperCase() || 'A',
       semestre,
       año: 2026,
       carrera: carrera.trim(),
@@ -50,6 +57,14 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
       horaFin,
       aula: aula.trim() || undefined,
       colorTag: '#174EAF',
+      cupoOfertado: cupoOfertado !== undefined ? Number(cupoOfertado) : undefined,
+      inscritos: inscritos !== undefined ? Number(inscritos) : undefined,
+      nsa: nsa || 1,
+      docenteAsignadoId: docenteId.trim() || undefined,
+      docenteAsignadoNombre: docenteNombre.trim() || undefined,
+      diasTexto: diasTexto.trim() || undefined,
+      horarioTexto: horarioTexto.trim() || `${horaInicio}-${horaFin}`,
+      cupo: cupoOfertado,
     };
 
     onSaveOfertaItem(newItem);
@@ -84,7 +99,7 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -100,18 +115,18 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
                 required
                 value={sigla}
                 onChange={(e) => setSigla(e.target.value)}
-                placeholder="CPA-100"
+                placeholder="ADM100"
                 className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl uppercase font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
               />
             </div>
             <div className="sm:col-span-2 space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">Nombre de Asignatura *</label>
+              <label className="block text-xs font-bold text-slate-700">Nombre de la Materia *</label>
               <input
                 type="text"
                 required
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej. Contabilidad Básica I"
+                placeholder="Ej. ADMINISTRACION GENERAL"
                 className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
               />
             </div>
@@ -119,13 +134,13 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">Grupo</label>
+              <label className="block text-xs font-bold text-slate-700">Grp (Grupo)</label>
               <input
                 type="text"
                 value={grupo}
                 onChange={(e) => setGrupo(e.target.value)}
-                placeholder="G1, SA"
-                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+                placeholder="A, G1, SA"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
               />
             </div>
             <div className="space-y-1.5">
@@ -145,26 +160,61 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
                 type="text"
                 value={aula}
                 onChange={(e) => setAula(e.target.value)}
-                placeholder="Aula 236-01"
+                placeholder="21318 o Aula 236-01"
                 className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+          </div>
+
+          {/* Plantilla UAGRM: C_Of, Insc, NSA */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">C_Of (Cupo)</label>
+              <input
+                type="number"
+                value={cupoOfertado ?? ''}
+                onChange={(e) => setCupoOfertado(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="40"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Insc (Inscritos)</label>
+              <input
+                type="number"
+                value={inscritos ?? ''}
+                onChange={(e) => setInscritos(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="21"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">NSA (Nivel)</label>
+              <input
+                type="text"
+                value={nsa}
+                onChange={(e) => setNsa(e.target.value)}
+                placeholder="1"
+                className="w-full px-3 py-2 text-xs sm:text-sm font-bold bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-bold text-slate-700">Carrera / Área Académica</label>
-              <span className="text-[10px] text-slate-400">Puedes escribirla a mano si lo deseas</span>
+              <label className="block text-xs font-bold text-slate-700">Carreras / Área</label>
+              <span className="text-[10px] text-slate-400">Códigos o nombre libre</span>
             </div>
             <input
               type="text"
               list="carreras-oferta-add-list"
               value={carrera}
               onChange={(e) => setCarrera(e.target.value)}
-              placeholder="Escribe la carrera (ej. Contaduría Pública, Finanzas...)"
+              placeholder="Ej. 105-5 109-1 o Contaduría Pública"
               className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
             />
             <datalist id="carreras-oferta-add-list">
+              <option value="105-5 109-1" />
               <option value="Contaduría Pública" />
               <option value="Auditoría Financiera" />
               <option value="Sistemas de Control de Gestión" />
@@ -174,13 +224,60 @@ export const AdminAddOfertaModal: React.FC<AdminAddOfertaModalProps> = ({
               <option value="Ingeniería Informática / Sistemas" />
               <option value="Ciencias Exactas" />
               <option value="Economía" />
-              <option value="Facultad de Ciencias Contables" />
             </datalist>
+          </div>
+
+          {/* Docente: Cod.Doc. & NombreDoc */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Cod.Doc.</label>
+              <input
+                type="text"
+                value={docenteId}
+                onChange={(e) => setDocenteId(e.target.value)}
+                placeholder="3000"
+                className="w-full px-3 py-2 text-xs sm:text-sm font-mono bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">NombreDoc</label>
+              <input
+                type="text"
+                value={docenteNombre}
+                onChange={(e) => setDocenteNombre(e.target.value)}
+                placeholder="AZOGUE ROMERO OSCAR"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+          </div>
+
+          {/* Días y Horario según formato UAGRM */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Días (ej. Lun, Mar-Jue)</label>
+              <input
+                type="text"
+                value={diasTexto}
+                onChange={(e) => setDiasTexto(e.target.value)}
+                placeholder="Lun"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">Horario (ej. 19:45-21:15)</label>
+              <input
+                type="text"
+                value={horarioTexto}
+                onChange={(e) => setHorarioTexto(e.target.value)}
+                placeholder="19:45-21:15"
+                className="w-full px-3 py-2 text-xs sm:text-sm font-mono bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">Modalidad</label>
+              <label className="block text-xs font-bold text-slate-700">Modalidad Asistencia</label>
               <select
                 value={modalidad}
                 onChange={(e) => setModalidad(e.target.value as ModalidadSemanal)}

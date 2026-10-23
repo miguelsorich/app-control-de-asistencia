@@ -39,22 +39,34 @@ export const AdminEditOfertaModal: React.FC<AdminEditOfertaModalProps> = ({
   const [horaInicio, setHoraInicio] = useState('07:00');
   const [horaFin, setHoraFin] = useState('08:30');
   const [aula, setAula] = useState('Aula 236-01');
-  const [cupo, setCupo] = useState<number | undefined>(60);
+  const [cupoOfertado, setCupoOfertado] = useState<number | undefined>(40);
+  const [inscritos, setInscritos] = useState<number | undefined>(0);
+  const [nsa, setNsa] = useState<string | number>(1);
+  const [docenteId, setDocenteId] = useState('');
+  const [docenteNombre, setDocenteNombre] = useState('');
+  const [diasTexto, setDiasTexto] = useState('Lun');
+  const [horarioTexto, setHorarioTexto] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (item) {
       setSigla(item.sigla || '');
       setNombre(item.nombre || '');
-      setGrupo(item.grupo || 'G1');
+      setGrupo(item.grupo || 'A');
       setSemestre(item.semestre || 1);
       setAño(item.año || 2026);
-      setCarrera(item.carrera || 'Contaduría Pública');
+      setCarrera(item.carrera || 'Facultad de Ciencias Contables');
       setModalidad(item.modalidad || 'LUN_MIE_VIE');
       setHoraInicio(item.horaInicio || '07:00');
       setHoraFin(item.horaFin || '08:30');
       setAula(item.aula || '');
-      setCupo(item.cupo || 60);
+      setCupoOfertado(item.cupoOfertado ?? item.cupo ?? 40);
+      setInscritos(item.inscritos ?? 0);
+      setNsa(item.nsa ?? item.semestre ?? 1);
+      setDocenteId(item.docenteAsignadoId || '');
+      setDocenteNombre(item.docenteAsignadoNombre || '');
+      setDiasTexto(item.diasTexto || (item.modalidad === 'LUN_MIE_VIE' ? 'Lun, Mié, Vie' : item.modalidad === 'MAR_JUE' ? 'Mar, Jue' : 'Sábado'));
+      setHorarioTexto(item.horarioTexto || `${item.horaInicio}-${item.horaFin}`);
       setError(null);
     }
   }, [item]);
@@ -71,7 +83,7 @@ export const AdminEditOfertaModal: React.FC<AdminEditOfertaModalProps> = ({
     const cleanCarrera = carrera.trim();
 
     if (!cleanSigla) {
-      setError('La sigla de la materia es requerida (ej. CPA-200).');
+      setError('La sigla de la materia es requerida (ej. ADM100).');
       return;
     }
     if (!cleanNombre) {
@@ -79,7 +91,7 @@ export const AdminEditOfertaModal: React.FC<AdminEditOfertaModalProps> = ({
       return;
     }
     if (!cleanGrupo) {
-      setError('El grupo es requerido (ej. G1, A, SC).');
+      setError('El grupo es requerido (ej. A, G1, SC).');
       return;
     }
     if (!cleanCarrera) {
@@ -99,7 +111,14 @@ export const AdminEditOfertaModal: React.FC<AdminEditOfertaModalProps> = ({
       horaInicio,
       horaFin,
       aula: aula.trim() || undefined,
-      cupo: cupo ? Number(cupo) : undefined,
+      cupoOfertado: cupoOfertado !== undefined ? Number(cupoOfertado) : undefined,
+      inscritos: inscritos !== undefined ? Number(inscritos) : undefined,
+      nsa: nsa || 1,
+      docenteAsignadoId: docenteId.trim() || undefined,
+      docenteAsignadoNombre: docenteNombre.trim() || undefined,
+      diasTexto: diasTexto.trim() || undefined,
+      horarioTexto: horarioTexto.trim() || `${horaInicio}-${horaFin}`,
+      cupo: cupoOfertado,
     };
 
     onUpdateOfertaItem(updatedItem);
@@ -270,6 +289,105 @@ export const AdminEditOfertaModal: React.FC<AdminEditOfertaModalProps> = ({
             </select>
           </div>
 
+          {/* Datos específicos de la plantilla oficial: C_Of, Insc, NSA */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                C_Of (Cupo)
+              </label>
+              <input
+                type="number"
+                value={cupoOfertado ?? ''}
+                onChange={(e) => setCupoOfertado(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="40"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Insc (Inscritos)
+              </label>
+              <input
+                type="number"
+                value={inscritos ?? ''}
+                onChange={(e) => setInscritos(e.target.value ? Number(e.target.value) : undefined)}
+                placeholder="21"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                NSA (Nivel)
+              </label>
+              <input
+                type="text"
+                value={nsa}
+                onChange={(e) => setNsa(e.target.value)}
+                placeholder="1"
+                className="w-full px-3 py-2 text-xs sm:text-sm font-bold bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+          </div>
+
+          {/* Docente Asignado en Oferta: Cod.Doc. & NombreDoc */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Cod.Doc.
+              </label>
+              <input
+                type="text"
+                value={docenteId}
+                onChange={(e) => setDocenteId(e.target.value)}
+                placeholder="3000"
+                className="w-full px-3 py-2 text-xs sm:text-sm font-mono bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                NombreDoc (Docente)
+              </label>
+              <input
+                type="text"
+                value={docenteNombre}
+                onChange={(e) => setDocenteNombre(e.target.value)}
+                placeholder="AZOGUE ROMERO OSCAR"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Días (ej. Lun, Mar-Jue, Sáb)
+              </label>
+              <input
+                type="text"
+                value={diasTexto}
+                onChange={(e) => setDiasTexto(e.target.value)}
+                placeholder="Lun"
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Horario (ej. 19:45-21:15)
+              </label>
+              <input
+                type="text"
+                value={horarioTexto}
+                onChange={(e) => setHorarioTexto(e.target.value)}
+                placeholder="19:45-21:15"
+                className="w-full px-3 py-2 text-xs sm:text-sm font-mono bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+              />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-700">
@@ -296,32 +414,17 @@ export const AdminEditOfertaModal: React.FC<AdminEditOfertaModalProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">
-                Aula / Ubicación
-              </label>
-              <input
-                type="text"
-                value={aula}
-                onChange={(e) => setAula(e.target.value)}
-                placeholder="Aula 236-04"
-                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">
-                Cupo Estimado
-              </label>
-              <input
-                type="number"
-                value={cupo || ''}
-                onChange={(e) => setCupo(e.target.value ? Number(e.target.value) : undefined)}
-                placeholder="60"
-                className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
-              />
-            </div>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700">
+              Aula / Ubicación (ej. 21318)
+            </label>
+            <input
+              type="text"
+              value={aula}
+              onChange={(e) => setAula(e.target.value)}
+              placeholder="21318"
+              className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
+            />
           </div>
 
           <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-2.5">

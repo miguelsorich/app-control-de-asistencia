@@ -482,17 +482,20 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
               </div>
             </div>
 
-            {/* Oferta Table */}
+            {/* Oferta Table matching official UAGRM model */}
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+              <table className="w-full text-left text-xs border-collapse whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
                     <th className="py-3 px-3.5">Sigla</th>
-                    <th className="py-3 px-3.5">Asignatura</th>
-                    <th className="py-3 px-3.5">Carrera</th>
-                    <th className="py-3 px-3.5 text-center">Grupo</th>
-                    <th className="py-3 px-3.5 text-center">Semestre</th>
-                    <th className="py-3 px-3.5">Modalidad & Horario</th>
+                    <th className="py-3 px-2 text-center">Grp</th>
+                    <th className="py-3 px-2.5 text-center">C_Of / Insc</th>
+                    <th className="py-3 px-3.5">Nombre de la Materia</th>
+                    <th className="py-3 px-2 text-center">NSA</th>
+                    <th className="py-3 px-3.5">Carreras</th>
+                    <th className="py-3 px-3.5">Docente (Cod. / Nombre)</th>
+                    <th className="py-3 px-3.5">Días & Horario</th>
+                    <th className="py-3 px-2.5 text-center">Aula</th>
                     <th className="py-3 px-3.5 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -500,34 +503,63 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                   {filteredOferta.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-3.5 font-bold font-mono text-[#174EAF]">
-                        <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                        <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-xs">
                           {item.sigla}
                         </span>
                       </td>
-                      <td className="py-3 px-3.5 font-semibold text-slate-900">
-                        {item.nombre}
-                      </td>
-                      <td className="py-3 px-3.5 text-slate-600">
-                        {item.carrera || 'Facultad General'}
-                      </td>
-                      <td className="py-3 px-3.5 text-center font-bold text-slate-700">
+                      <td className="py-3 px-2 text-center font-bold text-slate-800">
                         {item.grupo}
                       </td>
-                      <td className="py-3 px-3.5 text-center text-slate-600">
-                        {item.semestre}° Semestre
+                      <td className="py-3 px-2.5 text-center font-mono text-[11px] text-slate-600">
+                        {item.cupoOfertado !== undefined ? (
+                          <span className="bg-slate-100 px-2 py-0.5 rounded font-semibold text-slate-700">
+                            {item.cupoOfertado} / {item.inscritos ?? 0}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
                       </td>
-                      <td className="py-3 px-3.5 text-slate-600">
-                        <div className="text-[11px]">
+                      <td className="py-3 px-3.5 font-semibold text-slate-900 max-w-[220px] truncate" title={item.nombre}>
+                        {item.nombre}
+                      </td>
+                      <td className="py-3 px-2 text-center font-bold text-slate-700 font-mono">
+                        {item.nsa ?? item.semestre}
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-600 text-[11px] max-w-[160px] truncate" title={item.carrera}>
+                        {item.carrera || 'Facultad General'}
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-700 text-[11px]">
+                        {item.docenteAsignadoNombre ? (
+                          <div>
+                            <span className="font-semibold">{item.docenteAsignadoNombre}</span>
+                            {item.docenteAsignadoId && (
+                              <span className="text-[10px] text-slate-400 font-mono ml-1.5">
+                                ({item.docenteAsignadoId})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic">Sin asignar</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-600 text-[11px]">
+                        <div>
                           <span className="font-semibold text-slate-800">
-                            {item.modalidad === 'LUN_MIE_VIE'
-                              ? 'Lun-Mié-Vie'
-                              : item.modalidad === 'MAR_JUE'
-                              ? 'Mar-Jue'
-                              : 'Sábado'}
+                            {item.diasTexto ||
+                              (item.modalidad === 'LUN_MIE_VIE'
+                                ? 'Lun, Mié, Vie'
+                                : item.modalidad === 'MAR_JUE'
+                                ? 'Mar, Jue'
+                                : 'Sábado')}
                           </span>
                           <span className="text-slate-400 mx-1">•</span>
-                          <span>{item.horaInicio} - {item.horaFin}</span>
+                          <span className="font-mono">
+                            {item.horarioTexto || `${item.horaInicio} - ${item.horaFin}`}
+                          </span>
                         </div>
+                      </td>
+                      <td className="py-3 px-2.5 text-center font-mono font-bold text-slate-800 text-[11px]">
+                        {item.aula || '-'}
                       </td>
                       <td className="py-3 px-3.5 text-right space-x-1 whitespace-nowrap">
                         <button
@@ -555,7 +587,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                   ))}
                   {filteredOferta.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="text-center py-8 text-slate-400 italic">
+                      <td colSpan={10} className="text-center py-8 text-slate-400 italic">
                         No hay asignaturas en el catálogo con ese filtro.
                       </td>
                     </tr>

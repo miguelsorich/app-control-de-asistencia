@@ -75,19 +75,25 @@ export interface DocenteUsuario {
 
 export interface OfertaAcademicaItem {
   id: string;
-  sigla: string; // ej. "CPA-100", "ADM-101"
-  nombre: string; // ej. "CONTABILIDAD BÁSICA I"
-  grupo: string; // ej. "G1", "SA"
-  semestre: SemestreAsignatura; // 1 o 2
+  sigla: string; // ej. "ADM100", "CPA-100" (Sigla)
+  nombre: string; // ej. "ADMINISTRACION GENERAL" (Nombre de la Materia)
+  grupo: string; // ej. "A", "G1" (Grp)
+  semestre: SemestreAsignatura; // 1 o 2 (calculado desde NSA o Semestre)
   año: number;
-  carrera: string; // ej. "Contaduría Pública", "Auditoría Financiera", "Finanzas"
+  carrera: string; // ej. "105-5 109-1", "Contaduría Pública" (Carreras)
   modalidad: ModalidadSemanal;
-  horaInicio: string; // "07:00"
-  horaFin: string; // "08:30"
-  aula?: string;
+  horaInicio: string; // "19:45"
+  horaFin: string; // "21:15"
+  aula?: string; // "21318" (Aula)
   colorTag?: string;
-  docenteAsignadoId?: string;
-  docenteAsignadoNombre?: string;
+  docenteAsignadoId?: string; // "3000" (Cod.Doc.)
+  docenteAsignadoNombre?: string; // "AZOGUE ROMERO OSCAR" (NombreDoc)
+  cupoOfertado?: number; // 40 (C_Of)
+  inscritos?: number; // 21 (Insc)
+  nsa?: number | string; // 1 (NSA - Nivel Semestral Asignatura)
+  diasTexto?: string; // "Lun" o "Lun, Mie, Vie" (Días)
+  horarioTexto?: string; // "19:45-21:15" (Horario)
+  cupo?: number; // Compatibilidad
 }
 
 export interface Estudiante {
