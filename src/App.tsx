@@ -38,6 +38,10 @@ import {
   saveSesionToSupabase,
   fetchNotasFromSupabase,
   saveNotasBatchToSupabase,
+  fetchDocentesFromSupabase,
+  saveDocentesToSupabase,
+  fetchOfertaAcademicaFromSupabase,
+  saveOfertaAcademicaToSupabase,
 } from './services/supabaseSync';
 import { supabase } from './lib/supabase';
 import { CheckCircle2, GraduationCap, Lock } from 'lucide-react';
@@ -280,25 +284,114 @@ export default function App() {
   // Toast notification state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Supabase Initial Load and Sync
+  // Supabase Initial Load and Sync (Preservación permanente y sin pérdida de datos locales o creados por el administrador)
   const loadAllDataFromSupabase = useCallback(async () => {
     setIsSyncing(true);
     try {
-      const [remoteAsig, remoteEst, remoteAsis, remoteSes, remoteNot] = await Promise.all([
+      const [
+        remoteAsig,
+        remoteEst,
+        remoteAsis,
+        remoteSes,
+        remoteNot,
+        remoteDoc,
+        remoteOf,
+      ] = await Promise.all([
         fetchAsignaturasFromSupabase(),
         fetchEstudiantesFromSupabase(),
         fetchAsistenciasFromSupabase(),
         fetchSesionesFromSupabase(),
         fetchNotasFromSupabase(),
+        fetchDocentesFromSupabase(),
+        fetchOfertaAcademicaFromSupabase(),
       ]);
 
+      // 1. ASIGNATURAS: Merge remote with local and preserve Lic. Miguel Antonio Sorich Rojas's 4 subjects
       if (remoteAsig && remoteAsig.length > 0) {
-        setAsignaturas(remoteAsig);
+        setAsignaturas((prevLocal) => {
+          const map = new Map<string, Asignatura>();
+          INITIAL_SUBJECTS.forEach((initSub) => {
+            map.set(initSub.id, {
+              ...initSub,
+              docenteId: 'docente-6379',
+              docenteNombre: 'Lic. Miguel Antonio Sorich Rojas',
+            });
+          });
+          remoteAsig.forEach((s) => {
+            const existing = map.get(s.id);
+            map.set(s.id, {
+              ...s,
+              docenteId: s.docenteId || existing?.docenteId,
+              docenteNombre: s.docenteNombre || existing?.docenteNombre,
+              carrera: s.carrera || existing?.carrera,
+            });
+          });
+          prevLocal.forEach((s) => {
+            if (!map.has(s.id)) {
+              map.set(s.id, s);
+              saveAsignaturaToSupabase(s);
+            } else {
+              const current = map.get(s.id)!;
+              if (!current.docenteId && s.docenteId) {
+                map.set(s.id, {
+                  ...current,
+                  docenteId: s.docenteId,
+                  docenteNombre: s.docenteNombre,
+                });
+              }
+            }
+          });
+          return Array.from(map.values());
+        });
       } else {
         // Seed initial subjects to Supabase
         for (const s of asignaturas) {
           saveAsignaturaToSupabase(s);
         }
+      }
+
+      // 2. DOCENTES: Cargar desde Supabase y sincronizar con docentes creados por el administrador
+      if (remoteDoc && remoteDoc.length > 0) {
+        setDocentes((prevLocal) => {
+          const map = new Map<string, DocenteUsuario>();
+          map.set(INITIAL_DOCENTES[0].id, INITIAL_DOCENTES[0]);
+          remoteDoc.forEach((d) => map.set(d.id, d));
+          prevLocal.forEach((d) => {
+            if (!map.has(d.id)) {
+              map.set(d.id, d);
+            }
+          });
+          const merged = Array.from(map.values());
+          saveDocentesToSupabase(merged);
+          return merged;
+        });
+      } else {
+        setDocentes((prevLocal) => {
+          saveDocentesToSupabase(prevLocal);
+          return prevLocal;
+        });
+      }
+
+      // 3. OFERTA ACADÉMICA: Cargar desde Supabase y sincronizar catálogo maestro / importaciones
+      if (remoteOf && remoteOf.length > 0) {
+        setOfertaAcademica((prevLocal) => {
+          const map = new Map<string, OfertaAcademicaItem>();
+          INITIAL_OFERTA_ACADEMICA.forEach((o) => map.set(o.id, o));
+          remoteOf.forEach((o) => map.set(o.id, o));
+          prevLocal.forEach((o) => {
+            if (!map.has(o.id)) {
+              map.set(o.id, o);
+            }
+          });
+          const merged = Array.from(map.values());
+          saveOfertaAcademicaToSupabase(merged);
+          return merged;
+        });
+      } else {
+        setOfertaAcademica((prevLocal) => {
+          saveOfertaAcademicaToSupabase(prevLocal);
+          return prevLocal;
+        });
       }
 
       if (remoteEst && remoteEst.length > 0) {
@@ -594,12 +687,20 @@ export default function App() {
   };
 
   const handleSaveDocente = (newDoc: DocenteUsuario) => {
-    setDocentes((prev) => [newDoc, ...prev]);
+    setDocentes((prev) => {
+      const updated = [newDoc, ...prev.filter((d) => d.id !== newDoc.id)];
+      saveDocentesToSupabase(updated);
+      return updated;
+    });
     showToast(`Docente "${newDoc.nombreCompleto}" registrado con éxito.`);
   };
 
   const handleUpdateDocente = (updatedDoc: DocenteUsuario) => {
-    setDocentes((prev) => prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d)));
+    setDocentes((prev) => {
+      const updated = prev.map((d) => (d.id === updatedDoc.id ? updatedDoc : d));
+      saveDocentesToSupabase(updated);
+      return updated;
+    });
     if (currentDocente?.id === updatedDoc.id) {
       setCurrentDocente(updatedDoc);
     }
@@ -607,32 +708,53 @@ export default function App() {
   };
 
   const handleDeleteDocente = (docenteId: string) => {
-    setDocentes((prev) => prev.filter((d) => d.id !== docenteId));
+    setDocentes((prev) => {
+      const updated = prev.filter((d) => d.id !== docenteId);
+      saveDocentesToSupabase(updated);
+      return updated;
+    });
     showToast('Docente eliminado del sistema.');
   };
 
   const handleSaveOfertaItem = (newItem: OfertaAcademicaItem) => {
-    setOfertaAcademica((prev) => [newItem, ...prev]);
+    setOfertaAcademica((prev) => {
+      const updated = [newItem, ...prev.filter((o) => o.id !== newItem.id)];
+      saveOfertaAcademicaToSupabase(updated);
+      return updated;
+    });
     showToast(`Materia "${newItem.sigla} - ${newItem.nombre}" agregada al Maestro de Oferta.`);
   };
 
   const handleUpdateOfertaItem = (updatedItem: OfertaAcademicaItem) => {
-    setOfertaAcademica((prev) => prev.map((o) => (o.id === updatedItem.id ? updatedItem : o)));
+    setOfertaAcademica((prev) => {
+      const updated = prev.map((o) => (o.id === updatedItem.id ? updatedItem : o));
+      saveOfertaAcademicaToSupabase(updated);
+      return updated;
+    });
     showToast(`Materia "${updatedItem.sigla} - ${updatedItem.nombre}" actualizada en la oferta.`);
   };
 
   const handleImportOfertaItems = (items: OfertaAcademicaItem[]) => {
-    setOfertaAcademica((prev) => [...items, ...prev]);
+    setOfertaAcademica((prev) => {
+      const updated = [...items, ...prev];
+      saveOfertaAcademicaToSupabase(updated);
+      return updated;
+    });
     showToast(`${items.length} asignaturas importadas al Maestro de Oferta.`);
   };
 
   const handleDeleteOfertaItem = (itemId: string) => {
-    setOfertaAcademica((prev) => prev.filter((o) => o.id !== itemId));
+    setOfertaAcademica((prev) => {
+      const updated = prev.filter((o) => o.id !== itemId);
+      saveOfertaAcademicaToSupabase(updated);
+      return updated;
+    });
     showToast('Asignatura retirada de la oferta académica.');
   };
 
   const handleResetOfertaDefault = () => {
     setOfertaAcademica(INITIAL_OFERTA_ACADEMICA);
+    saveOfertaAcademicaToSupabase(INITIAL_OFERTA_ACADEMICA);
     showToast('Oferta académica restablecida con el catálogo oficial UAGRM.');
   };
 

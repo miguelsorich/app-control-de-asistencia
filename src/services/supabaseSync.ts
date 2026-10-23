@@ -6,6 +6,8 @@ import {
   SesionHabilitacion,
   NotaEstudiante,
   RegistroEnvioCorreo,
+  DocenteUsuario,
+  OfertaAcademicaItem,
 } from '../types';
 
 export const SUPABASE_SQL_SCHEMA = `
@@ -129,24 +131,72 @@ export async function testSupabaseConnection(): Promise<{ ok: boolean; message: 
 // ---------------------------------------------
 // ASIGNATURAS
 // ---------------------------------------------
+export async function fetchAsignaturasMetadataFromSupabase(): Promise<Record<string, { docenteId?: string; docenteNombre?: string; carrera?: string }> | null> {
+  try {
+    const { data, error } = await supabase
+      .from('registros_envio_correo')
+      .select('cuerpo_mensaje')
+      .eq('id', 'SYSTEM_ASIGNATURAS_METADATA')
+      .single();
+    if (error || !data || !data.cuerpo_mensaje) return null;
+    return JSON.parse(data.cuerpo_mensaje);
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function saveAsignaturasMetadataToSupabase(metadata: Record<string, { docenteId?: string; docenteNombre?: string; carrera?: string }>): Promise<boolean> {
+  try {
+    const { error } = await supabase.from('registros_envio_correo').upsert({
+      id: 'SYSTEM_ASIGNATURAS_METADATA',
+      asignatura_id: 'SYSTEM',
+      tipo: 'SYSTEM_STATE',
+      asunto: 'METADATA',
+      destinatario_ru: 'SYSTEM',
+      destinatario_nombre: 'ADMIN',
+      destinatario_correo: 'admin@uagrm.edu.bo',
+      cuerpo_mensaje: JSON.stringify(metadata),
+      fecha_envio: Date.now(),
+      estado: 'ENVIADO',
+    });
+    return !error;
+  } catch (e) {
+    return false;
+  }
+}
+
 export async function fetchAsignaturasFromSupabase(): Promise<Asignatura[] | null> {
   try {
-    const { data, error } = await supabase.from('asignaturas').select('*').order('fecha_creacion', { ascending: false });
+    const [asigResult, metaMap] = await Promise.all([
+      supabase.from('asignaturas').select('*').order('fecha_creacion', { ascending: false }),
+      fetchAsignaturasMetadataFromSupabase(),
+    ]);
+
+    const { data, error } = asigResult;
     if (error || !data) return null;
-    return data.map((row: any) => ({
-      id: row.id,
-      nombre: row.nombre,
-      sigla: row.sigla,
-      grupo: row.grupo,
-      semestre: row.semestre === 2 ? 2 : 1,
-      año: Number(row.año || 2026),
-      modalidad: row.modalidad,
-      horaInicio: row.hora_inicio,
-      horaFin: row.hora_fin,
-      aula: row.aula || '',
-      colorTag: row.color_tag || '',
-      fechaCreacion: Number(row.fecha_creacion || Date.now()),
-    }));
+
+    return data.map((row: any) => {
+      const meta = metaMap?.[row.id];
+      const isInitialMiguel = ['asig-1', 'asig-2', 'asig-3', 'asig-4'].includes(row.id);
+
+      return {
+        id: row.id,
+        nombre: row.nombre,
+        sigla: row.sigla,
+        grupo: row.grupo,
+        semestre: row.semestre === 2 ? 2 : 1,
+        año: Number(row.año || 2026),
+        modalidad: row.modalidad,
+        horaInicio: row.hora_inicio,
+        horaFin: row.hora_fin,
+        aula: row.aula || '',
+        colorTag: row.color_tag || '',
+        fechaCreacion: Number(row.fecha_creacion || Date.now()),
+        docenteId: meta?.docenteId || (isInitialMiguel ? 'docente-6379' : undefined),
+        docenteNombre: meta?.docenteNombre || (isInitialMiguel ? 'Lic. Miguel Antonio Sorich Rojas' : undefined),
+        carrera: meta?.carrera || (isInitialMiguel ? 'Facultad de Ciencias Contables' : undefined),
+      };
+    });
   } catch (e) {
     console.warn('[Supabase] fetchAsignaturas failed:', e);
     return null;
@@ -173,6 +223,20 @@ export async function saveAsignaturaToSupabase(asig: Asignatura): Promise<boolea
       console.warn('[Supabase] saveAsignatura error:', error.message);
       return false;
     }
+
+    // Persist docenteId and other metadata
+    if (asig.docenteId || asig.carrera) {
+      fetchAsignaturasMetadataFromSupabase().then((existingMeta) => {
+        const nextMeta = existingMeta ? { ...existingMeta } : {};
+        nextMeta[asig.id] = {
+          docenteId: asig.docenteId,
+          docenteNombre: asig.docenteNombre,
+          carrera: asig.carrera,
+        };
+        saveAsignaturasMetadataToSupabase(nextMeta);
+      });
+    }
+
     return true;
   } catch (e) {
     console.warn('[Supabase] saveAsignatura failed:', e);
@@ -531,6 +595,102 @@ export async function saveCorreosBatchToSupabase(correos: RegistroEnvioCorreo[])
     return true;
   } catch (e) {
     console.warn('[Supabase] saveCorreosBatch failed:', e);
+    return false;
+  }
+}
+
+// ---------------------------------------------
+// DOCENTES (PERSISTENCIA GLOBAL EN LA NUBE)
+// ---------------------------------------------
+export async function fetchDocentesFromSupabase(): Promise<DocenteUsuario[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from('registros_envio_correo')
+      .select('cuerpo_mensaje')
+      .eq('id', 'SYSTEM_DOCENTES_CATALOG')
+      .single();
+    if (error || !data || !data.cuerpo_mensaje) return null;
+    const parsed = JSON.parse(data.cuerpo_mensaje);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return null;
+  } catch (e) {
+    console.warn('[Supabase] fetchDocentes failed:', e);
+    return null;
+  }
+}
+
+export async function saveDocentesToSupabase(docentes: DocenteUsuario[]): Promise<boolean> {
+  if (!docentes) return false;
+  try {
+    const { error } = await supabase.from('registros_envio_correo').upsert({
+      id: 'SYSTEM_DOCENTES_CATALOG',
+      asignatura_id: 'SYSTEM',
+      tipo: 'SYSTEM_STATE',
+      asunto: 'DOCENTES',
+      destinatario_ru: 'SYSTEM',
+      destinatario_nombre: 'ADMIN',
+      destinatario_correo: 'admin@uagrm.edu.bo',
+      cuerpo_mensaje: JSON.stringify(docentes),
+      fecha_envio: Date.now(),
+      estado: 'ENVIADO',
+    });
+    if (error) {
+      console.warn('[Supabase] saveDocentes error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('[Supabase] saveDocentes failed:', e);
+    return false;
+  }
+}
+
+// ---------------------------------------------
+// OFERTA ACADÉMICA (PERSISTENCIA GLOBAL EN LA NUBE)
+// ---------------------------------------------
+export async function fetchOfertaAcademicaFromSupabase(): Promise<OfertaAcademicaItem[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from('registros_envio_correo')
+      .select('cuerpo_mensaje')
+      .eq('id', 'SYSTEM_OFERTA_CATALOG')
+      .single();
+    if (error || !data || !data.cuerpo_mensaje) return null;
+    const parsed = JSON.parse(data.cuerpo_mensaje);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return null;
+  } catch (e) {
+    console.warn('[Supabase] fetchOfertaAcademica failed:', e);
+    return null;
+  }
+}
+
+export async function saveOfertaAcademicaToSupabase(oferta: OfertaAcademicaItem[]): Promise<boolean> {
+  if (!oferta) return false;
+  try {
+    const { error } = await supabase.from('registros_envio_correo').upsert({
+      id: 'SYSTEM_OFERTA_CATALOG',
+      asignatura_id: 'SYSTEM',
+      tipo: 'SYSTEM_STATE',
+      asunto: 'OFERTA',
+      destinatario_ru: 'SYSTEM',
+      destinatario_nombre: 'ADMIN',
+      destinatario_correo: 'admin@uagrm.edu.bo',
+      cuerpo_mensaje: JSON.stringify(oferta),
+      fecha_envio: Date.now(),
+      estado: 'ENVIADO',
+    });
+    if (error) {
+      console.warn('[Supabase] saveOfertaAcademica error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('[Supabase] saveOfertaAcademica failed:', e);
     return false;
   }
 }
