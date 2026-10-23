@@ -15,7 +15,6 @@ import { AttendanceReportsView } from './AttendanceReportsView';
 import { SubjectGradesView } from './SubjectGradesView';
 import { SubjectStudentsView } from './SubjectStudentsView';
 import { TeacherAttendanceCharts } from './TeacherAttendanceCharts';
-import { AttendanceMarkingHistory } from './AttendanceMarkingHistory';
 import { SelectFromOfferModal } from './SelectFromOfferModal';
 import { TeacherChangeCredentialsModal } from './TeacherChangeCredentialsModal';
 import { INITIAL_DOCENTES } from '../data/initialDocentes';
@@ -81,8 +80,7 @@ export type DocenteSection =
   | 'ESTUDIANTES'
   | 'HABILITACION'
   | 'REPORTES'
-  | 'NOTAS'
-  | 'HISTORIAL';
+  | 'NOTAS';
 
 export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
   asignaturas,
@@ -673,19 +671,6 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
           <GraduationCap className="w-3.5 h-3.5" />
           <span>5. Notas</span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSection('HISTORIAL')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap cursor-pointer ${
-            activeSection === 'HISTORIAL'
-              ? 'bg-[#174EAF] text-white shadow-xs'
-              : 'bg-[#F5F7FA] text-[#667085] hover:text-[#172033] hover:bg-[#E8F0FC]'
-          }`}
-        >
-          <History className="w-3.5 h-3.5" />
-          <span>6. Historial</span>
-        </button>
       </div>
     </div>
   );
@@ -968,40 +953,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
                 <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
-
-            {/* 6. HISTORIAL DE MARCACIONES (AUDITORÍA GLOBAL) */}
-            <div
-              id="card-teacher-historial-marcaciones"
-              onClick={() => setActiveSection('HISTORIAL')}
-              className="bg-white rounded-2xl border border-[#DCE3EC] hover:border-[#174EAF] hover:shadow-md transition-all duration-200 p-6 flex flex-col justify-between cursor-pointer group"
-            >
-              <div className="space-y-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#E8F0FC] text-[#174EAF] group-hover:bg-[#174EAF] group-hover:text-white transition-colors flex items-center justify-center shadow-2xs">
-                  <History className="w-6 h-6" />
-                </div>
-                <div>
-                  <h4 className="text-lg font-bold text-[#172033] group-hover:text-[#174EAF] transition-colors">
-                    6. Historial de marcaciones
-                  </h4>
-                  <p className="text-xs text-[#667085] mt-1.5 leading-relaxed">
-                    Auditoría en tiempo real, tabla paginada con los registros de asistencia exclusivos de tus estudiantes y detección de duplicados.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-6 pt-4 border-t border-[#DCE3EC] flex items-center justify-between text-xs font-bold text-[#174EAF]">
-                <span>Ver historial y duplicados</span>
-                <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </div>
           </div>
         </div>
-
-        {/* COMPONENTE HISTORIAL DE MARCACIONES DENTRO DEL DASHBOARD */}
-        <AttendanceMarkingHistory
-          asignaturas={teacherAsignaturas}
-          estudiantes={estudiantes}
-          registrosAsistencia={registrosAsistencia}
-        />
 
         <SelectFromOfferModal
           isOpen={isSelectOfferOpen}
@@ -1386,23 +1339,6 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
           estudiantes={teacherEstudiantes}
           notas={teacherNotas}
           onSaveGrades={onSaveGrades}
-        />
-      </div>
-    );
-  }
-
-  // ==========================================
-  // SECTION 6: HISTORIAL DE MARCACIONES (AUDITORÍA DOCENTE)
-  // ==========================================
-  if (activeSection === 'HISTORIAL') {
-    return (
-      <div id="teacher-section-historial" className="max-w-5xl mx-auto space-y-6 animate-in fade-in duration-150">
-        {renderTeacherPortalHeader('6. Historial de marcaciones')}
-
-        <AttendanceMarkingHistory
-          asignaturas={teacherAsignaturas}
-          estudiantes={teacherEstudiantes}
-          registrosAsistencia={teacherRegistrosAsistencia}
         />
       </div>
     );

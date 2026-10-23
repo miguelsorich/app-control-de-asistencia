@@ -12,6 +12,7 @@ import { AdminAddOfertaModal } from './AdminAddOfertaModal';
 import { AdminImportOfertaModal } from './AdminImportOfertaModal';
 import { AdminEditOfertaModal } from './AdminEditOfertaModal';
 import { AdminChangeCredentialsModal, AdminCredentials } from './AdminChangeCredentialsModal';
+import { AttendanceMarkingHistory } from './AttendanceMarkingHistory';
 import {
   Shield,
   Users,
@@ -37,6 +38,7 @@ import {
   Ban,
   Lock,
   Unlock,
+  History,
 } from 'lucide-react';
 
 interface AdminPortalViewProps {
@@ -78,7 +80,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
   onAssignOfertaToTeacher,
   onExitAdmin,
 }) => {
-  const [activeTab, setActiveTab] = useState<'DOCENTES' | 'OFERTA' | 'SUPERVISION'>('DOCENTES');
+  const [activeTab, setActiveTab] = useState<'DOCENTES' | 'OFERTA' | 'SUPERVISION' | 'HISTORIAL'>('DOCENTES');
 
   // Search & Filters for Docentes
   const [searchDocente, setSearchDocente] = useState('');
@@ -232,6 +234,19 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
         >
           <BarChart3 className="w-4 h-4" />
           <span>Supervisión General</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('HISTORIAL')}
+          className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'HISTORIAL'
+              ? 'bg-[#174EAF] text-white shadow-xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>Historial de Marcaciones ({registrosAsistencia.length})</span>
         </button>
       </div>
 
@@ -686,6 +701,34 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
               </table>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* TAB 4: HISTORIAL DE MARCACIONES (EXCLUSIVO ADMINISTRADOR) */}
+      {/* ==================================================== */}
+      {activeTab === 'HISTORIAL' && (
+        <div className="space-y-4 animate-in fade-in duration-150">
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                Historial y Auditoría Global de Marcaciones
+              </h2>
+              <p className="text-xs text-slate-500">
+                Supervisión institucional centralizada de marcaciones, control de duplicados y asistencia en vivo en toda la Facultad
+              </p>
+            </div>
+            <div className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-blue-50 text-[#174EAF] border border-blue-200 self-start sm:self-auto">
+              Total Registros Globales: <strong>{registrosAsistencia.length}</strong>
+            </div>
+          </div>
+
+          <AttendanceMarkingHistory
+            asignaturas={asignaturas}
+            estudiantes={estudiantes}
+            registrosAsistencia={registrosAsistencia}
+            isAdmin={true}
+          />
         </div>
       )}
 

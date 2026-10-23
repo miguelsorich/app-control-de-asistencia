@@ -27,6 +27,7 @@ interface AttendanceMarkingHistoryProps {
   asignaturas: Asignatura[];
   estudiantes: Estudiante[];
   registrosAsistencia: RegistroAsistencia[];
+  isAdmin?: boolean;
   className?: string;
 }
 
@@ -34,6 +35,7 @@ export const AttendanceMarkingHistory: React.FC<AttendanceMarkingHistoryProps> =
   asignaturas,
   estudiantes,
   registrosAsistencia,
+  isAdmin = false,
   className = '',
 }) => {
   // Filters
@@ -246,7 +248,7 @@ export const AttendanceMarkingHistory: React.FC<AttendanceMarkingHistoryProps> =
                   Historial de Marcaciones
                 </h3>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#E8F0FC] text-[#174EAF] border border-[#DCE3EC]">
-                  Mis Asignaturas
+                  {isAdmin ? 'Auditoría Global (Administrador)' : 'Mis Asignaturas'}
                 </span>
                 {duplicateRecordsCount > 0 ? (
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
@@ -261,7 +263,9 @@ export const AttendanceMarkingHistory: React.FC<AttendanceMarkingHistoryProps> =
                 )}
               </div>
               <p className="text-xs text-[#667085] mt-1 leading-relaxed">
-                Muestra las marcaciones de asistencia de los estudiantes inscritos en tus asignaturas en orden cronológico inverso para auditoría y verificación en tiempo real.
+                {isAdmin
+                  ? 'Muestra todas las marcaciones de asistencia registradas en la facultad en tiempo real para auditoría institucional, supervisión de docentes y detección de inconsistencias.'
+                  : 'Muestra las marcaciones de asistencia de los estudiantes inscritos en tus asignaturas en orden cronológico inverso para auditoría y verificación en tiempo real.'}
               </p>
             </div>
           </div>
