@@ -14,6 +14,7 @@ import {
   AlertCircle,
   RotateCcw,
 } from 'lucide-react';
+import { matchOfertaItem } from '../utils/searchHelpers';
 
 interface SelectFromOfferModalProps {
   isOpen: boolean;
@@ -63,24 +64,11 @@ export const SelectFromOfferModal: React.FC<SelectFromOfferModalProps> = ({
     return map;
   }, [existingAsignaturas]);
 
-  // Filtered offer items
+  // Filtered offer items using robust multi-field, multi-token, accent-free search
   const filteredOffer = useMemo(() => {
-    return ofertaAcademica.filter((item) => {
-      if (selectedCarrera !== 'TODAS' && item.carrera !== selectedCarrera) {
-        return false;
-      }
-      if (selectedSemestre !== 'TODOS' && item.semestre.toString() !== selectedSemestre) {
-        return false;
-      }
-      if (!searchTerm.trim()) return true;
-
-      const term = searchTerm.toLowerCase();
-      const matchSigla = item.sigla.toLowerCase().includes(term);
-      const matchNombre = item.nombre.toLowerCase().includes(term);
-      const matchGrupo = item.grupo.toLowerCase().includes(term);
-      const matchCarrera = (item.carrera || '').toLowerCase().includes(term);
-      return matchSigla || matchNombre || matchGrupo || matchCarrera;
-    });
+    return ofertaAcademica.filter((item) =>
+      matchOfertaItem(item, searchTerm, selectedCarrera, selectedSemestre)
+    );
   }, [ofertaAcademica, searchTerm, selectedCarrera, selectedSemestre]);
 
   if (!isOpen) return null;

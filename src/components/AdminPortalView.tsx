@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   DocenteUsuario,
   OfertaAcademicaItem,
@@ -39,7 +39,10 @@ import {
   Lock,
   Unlock,
   History,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
+import { matchOfertaItem } from '../utils/searchHelpers';
 
 interface AdminPortalViewProps {
   docentes: DocenteUsuario[];
@@ -90,6 +93,8 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
   // Search & Filters for Oferta
   const [searchOferta, setSearchOferta] = useState('');
   const [filterOfertaCarrera, setFilterOfertaCarrera] = useState<string>('TODAS');
+  const [ofertaPage, setOfertaPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(50);
 
   // Modals state
   const [isAddDocenteOpen, setIsAddDocenteOpen] = useState(false);
@@ -112,31 +117,46 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
     );
   }, [docentes, searchDocente]);
 
-  // Unique carreras in offer
+  // Unique carreras in offer (both full combined strings and distinct career codes)
   const uniqueOfertaCarreras = useMemo(() => {
     const set = new Set<string>();
     ofertaAcademica.forEach((o) => {
-      if (o.carrera) set.add(o.carrera);
+      if (!o.carrera) return;
+      const trimmed = o.carrera.trim();
+      if (trimmed) set.add(trimmed);
+      // Also add individual career codes if space-separated
+      const tokens = trimmed.split(/\s+/);
+      if (tokens.length > 1) {
+        tokens.forEach((t) => {
+          if (t.trim()) set.add(t.trim());
+        });
+      }
     });
     return Array.from(set).sort();
   }, [ofertaAcademica]);
 
-  // Filtered Oferta
+  // Filtered Oferta using robust multi-field, multi-token, accent-free search
   const filteredOferta = useMemo(() => {
-    return ofertaAcademica.filter((item) => {
-      if (filterOfertaCarrera !== 'TODAS' && item.carrera !== filterOfertaCarrera) {
-        return false;
-      }
-      if (!searchOferta.trim()) return true;
-      const term = searchOferta.toLowerCase();
-      return (
-        item.sigla.toLowerCase().includes(term) ||
-        item.nombre.toLowerCase().includes(term) ||
-        item.grupo.toLowerCase().includes(term) ||
-        (item.carrera || '').toLowerCase().includes(term)
-      );
-    });
+    return ofertaAcademica.filter((item) =>
+      matchOfertaItem(item, searchOferta, filterOfertaCarrera)
+    );
   }, [ofertaAcademica, searchOferta, filterOfertaCarrera]);
+
+  // Reset to first page when search or carrera filter changes
+  useEffect(() => {
+    setOfertaPage(1);
+  }, [searchOferta, filterOfertaCarrera, itemsPerPage]);
+
+  const totalOfertaPages = Math.max(
+    1,
+    Math.ceil(filteredOferta.length / (itemsPerPage === -1 ? filteredOferta.length || 1 : itemsPerPage))
+  );
+
+  const paginatedOferta = useMemo(() => {
+    if (itemsPerPage === -1) return filteredOferta;
+    const start = (ofertaPage - 1) * itemsPerPage;
+    return filteredOferta.slice(start, start + itemsPerPage);
+  }, [filteredOferta, ofertaPage, itemsPerPage]);
 
   // Map docente to count of assigned subjects
   const docenteSubjectsMap = useMemo(() => {
@@ -495,35 +515,86 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
             </div>
 
             {/* Filter controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2">
-              <div className="sm:col-span-8 relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={searchOferta}
-                  onChange={(e) => setSearchOferta(e.target.value)}
-                  placeholder="Buscar en oferta por sigla, nombre o grupo..."
-                  className="w-full pl-9 pr-3.5 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
-                />
+            <div className="space-y-2 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                <div className="sm:col-span-8 relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchOferta}
+                    onChange={(e) => setSearchOferta(e.target.value)}
+                    placeholder="Buscar por sigla (ej. CPA500, ADM100), materia, docente (ej. Azogue, 3000), aula o grupo..."
+                    className="w-full pl-9 pr-20 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF] transition-all"
+                  />
+                  {searchOferta && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchOferta('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 hover:text-slate-600 px-2 py-0.5 rounded hover:bg-slate-200 cursor-pointer"
+                      title="Limpiar búsqueda"
+                    >
+                      ✕ Limpiar
+                    </button>
+                  )}
+                </div>
+
+                <div className="sm:col-span-4">
+                  <select
+                    value={filterOfertaCarrera}
+                    onChange={(e) => setFilterOfertaCarrera(e.target.value)}
+                    className="w-full py-2.5 px-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF] transition-all"
+                  >
+                    <option value="TODAS">Todas las Carreras</option>
+                    {uniqueOfertaCarreras.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="sm:col-span-4">
-                <select
-                  value={filterOfertaCarrera}
-                  onChange={(e) => setFilterOfertaCarrera(e.target.value)}
-                  className="w-full py-2 px-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#174EAF]"
-                >
-                  <option value="TODAS">Todas las Carreras</option>
-                  {uniqueOfertaCarreras.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+
+              {/* Status and Results Counter */}
+              <div className="flex items-center justify-between text-xs text-slate-600 flex-wrap gap-2 pt-1 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span>
+                    Mostrando{' '}
+                    <strong>
+                      {itemsPerPage === -1
+                        ? filteredOferta.length
+                        : Math.min(filteredOferta.length, (ofertaPage - 1) * itemsPerPage + 1)}
+                      {itemsPerPage !== -1 && filteredOferta.length > 0
+                        ? ` - ${Math.min(filteredOferta.length, ofertaPage * itemsPerPage)}`
+                        : ''}
+                    </strong>{' '}
+                    de <strong>{filteredOferta.length}</strong> asignaturas encontradas{' '}
+                    <span className="text-slate-400">({ofertaAcademica.length} en catálogo total)</span>
+                  </span>
+
+                  {(searchOferta || filterOfertaCarrera !== 'TODAS') && (
+                    <span className="bg-blue-50 text-[#174EAF] font-bold px-2 py-0.5 rounded border border-blue-200 text-[10px]">
+                      Filtro activo
+                    </span>
+                  )}
+                </div>
+
+                {(searchOferta || filterOfertaCarrera !== 'TODAS') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchOferta('');
+                      setFilterOfertaCarrera('TODAS');
+                    }}
+                    className="text-xs font-bold text-[#174EAF] hover:text-[#103B88] hover:underline cursor-pointer"
+                  >
+                    Restablecer filtros
+                  </button>
+                )}
               </div>
             </div>
 
             {/* Oferta Table matching official UAGRM model */}
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto border border-slate-200 rounded-xl">
               <table className="w-full text-left text-xs border-collapse whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 font-bold uppercase tracking-wider text-[11px]">
@@ -540,7 +611,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredOferta.map((item) => (
+                  {paginatedOferta.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-3.5 font-bold font-mono text-[#174EAF]">
                         <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-xs">
@@ -627,14 +698,82 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                   ))}
                   {filteredOferta.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="text-center py-8 text-slate-400 italic">
-                        No hay asignaturas en el catálogo con ese filtro.
+                      <td colSpan={10} className="text-center py-12 text-slate-500">
+                        <p className="font-bold text-sm text-slate-700">
+                          No se encontraron materias con el criterio buscado
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Prueba buscando por sigla (ej. CPA500), nombre o docente (ej. Azogue, 3000)
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchOferta('');
+                            setFilterOfertaCarrera('TODAS');
+                          }}
+                          className="mt-3 px-3 py-1.5 text-xs font-bold text-[#174EAF] bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Restablecer búsqueda
+                        </button>
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {filteredOferta.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-200 text-xs text-slate-600">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500">Filas por página:</span>
+                  <select
+                    value={itemsPerPage}
+                    onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                    className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#174EAF]"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                    <option value={-1}>Todas ({filteredOferta.length})</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <span className="mr-2 text-slate-500">
+                    Página <strong>{ofertaPage}</strong> de <strong>{totalOfertaPages}</strong>
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={ofertaPage <= 1}
+                    onClick={() => setOfertaPage((p) => Math.max(1, p - 1))}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                      ofertaPage <= 1
+                        ? 'opacity-40 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Anterior</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={ofertaPage >= totalOfertaPages}
+                    onClick={() => setOfertaPage((p) => Math.min(totalOfertaPages, p + 1))}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                      ofertaPage >= totalOfertaPages
+                        ? 'opacity-40 cursor-not-allowed bg-slate-50 text-slate-400 border-slate-200'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    <span>Siguiente</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

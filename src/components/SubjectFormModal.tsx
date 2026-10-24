@@ -28,6 +28,7 @@ import {
   ChevronDown,
   RotateCcw,
 } from 'lucide-react';
+import { matchOfertaItem } from '../utils/searchHelpers';
 
 interface SubjectFormModalProps {
   isOpen: boolean;
@@ -103,34 +104,11 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   // Filtered offer items for the search dropdown
   const filteredOfferItems = useMemo(() => {
     if (!offerSearchTerm.trim() && offerCarreraFilter === 'TODAS' && offerSemestreFilter === 'TODOS') {
-      return ofertaAcademica.slice(0, 15);
+      return ofertaAcademica.slice(0, 20);
     }
-    const term = offerSearchTerm.toLowerCase().trim();
-    return ofertaAcademica.filter((item) => {
-      if (offerCarreraFilter !== 'TODAS' && item.carrera !== offerCarreraFilter) {
-        return false;
-      }
-      if (offerSemestreFilter !== 'TODOS' && item.semestre.toString() !== offerSemestreFilter) {
-        return false;
-      }
-      if (!term) return true;
-
-      const matchSigla = item.sigla.toLowerCase().includes(term);
-      const matchNombre = item.nombre.toLowerCase().includes(term);
-      const matchGrupo = item.grupo.toLowerCase().includes(term);
-      const matchDocente = (item.docenteAsignadoNombre || '').toLowerCase().includes(term);
-      const matchDocId = (item.docenteAsignadoId || '').toLowerCase().includes(term);
-      const matchCarrera = (item.carrera || '').toLowerCase().includes(term);
-
-      return (
-        matchSigla ||
-        matchNombre ||
-        matchGrupo ||
-        matchDocente ||
-        matchDocId ||
-        matchCarrera
-      );
-    });
+    return ofertaAcademica.filter((item) =>
+      matchOfertaItem(item, offerSearchTerm, offerCarreraFilter, offerSemestreFilter)
+    );
   }, [ofertaAcademica, offerSearchTerm, offerCarreraFilter, offerSemestreFilter]);
 
   // Unique siglas and names for native datalists
