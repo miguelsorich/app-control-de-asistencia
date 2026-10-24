@@ -708,12 +708,27 @@ export default function App() {
   };
 
   const handleDeleteDocente = (docenteId: string) => {
+    // 1. Remove teacher
     setDocentes((prev) => {
       const updated = prev.filter((d) => d.id !== docenteId);
       saveDocentesToSupabase(updated);
       return updated;
     });
-    showToast('Docente eliminado del sistema.');
+
+    // 2. Unassign or remove subjects belonging to the deleted teacher
+    // (Never delete Lic. Miguel Antonio Sorich Rojas's default subjects if id === 'docente-6379')
+    setAsignaturas((prev) => {
+      const remaining = prev.filter((a) => {
+        if (a.docenteId === docenteId && docenteId !== 'docente-6379') {
+          deleteAsignaturaFromSupabase(a.id);
+          return false;
+        }
+        return true;
+      });
+      return remaining;
+    });
+
+    showToast('Docente y asignaciones asociadas retirados del sistema.');
   };
 
   const handleSaveOfertaItem = (newItem: OfertaAcademicaItem) => {
@@ -763,27 +778,61 @@ export default function App() {
     const teacherId = currentDocente?.id || 'docente-6379';
     const teacherName = currentDocente?.nombreCompleto || 'Lic. Miguel Antonio Sorich Rojas';
 
-    const newSubject: Asignatura = {
-      id: `asig-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      sigla: item.sigla,
-      nombre: item.nombre,
-      grupo: item.grupo,
-      semestre: item.semestre,
-      año: item.año || 2026,
-      modalidad: item.modalidad,
-      horaInicio: item.horaInicio,
-      horaFin: item.horaFin,
-      aula: item.aula,
-      colorTag: item.colorTag || '#174EAF',
-      fechaCreacion: Date.now(),
-      docenteId: teacherId,
-      docenteNombre: teacherName,
-      origenOfertaId: item.id,
-      carrera: item.carrera,
-    };
+    setAsignaturas((prev) => {
+      const existingIndex = prev.findIndex(
+        (a) =>
+          a.origenOfertaId === item.id ||
+          (a.sigla.trim().toUpperCase() === item.sigla.trim().toUpperCase() &&
+            a.grupo.trim().toUpperCase() === item.grupo.trim().toUpperCase())
+      );
 
-    setAsignaturas((prev) => [newSubject, ...prev]);
-    saveAsignaturaToSupabase(newSubject);
+      if (existingIndex >= 0) {
+        // Re-activate and transfer / assign to the current teacher!
+        const existing = prev[existingIndex];
+        const updated: Asignatura = {
+          ...existing,
+          sigla: item.sigla,
+          nombre: item.nombre,
+          grupo: item.grupo,
+          semestre: item.semestre,
+          año: item.año || 2026,
+          modalidad: item.modalidad,
+          horaInicio: item.horaInicio,
+          horaFin: item.horaFin,
+          aula: item.aula,
+          docenteId: teacherId,
+          docenteNombre: teacherName,
+          origenOfertaId: item.id,
+          carrera: item.carrera || existing.carrera,
+        };
+        const nextList = [...prev];
+        nextList[existingIndex] = updated;
+        saveAsignaturaToSupabase(updated);
+        return nextList;
+      } else {
+        const newSubject: Asignatura = {
+          id: `asig-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          sigla: item.sigla,
+          nombre: item.nombre,
+          grupo: item.grupo,
+          semestre: item.semestre,
+          año: item.año || 2026,
+          modalidad: item.modalidad,
+          horaInicio: item.horaInicio,
+          horaFin: item.horaFin,
+          aula: item.aula,
+          colorTag: item.colorTag || '#174EAF',
+          fechaCreacion: Date.now(),
+          docenteId: teacherId,
+          docenteNombre: teacherName,
+          origenOfertaId: item.id,
+          carrera: item.carrera,
+        };
+        saveAsignaturaToSupabase(newSubject);
+        return [newSubject, ...prev];
+      }
+    });
+
     showToast(`Asignatura "${item.sigla} (${item.grupo})" incorporada exitosamente a tu portal docente.`);
   };
 
@@ -799,7 +848,7 @@ export default function App() {
   };
 
   const handleSaveSubject = (
-    data: Omit<Asignatura, 'id' | 'fechaCreacion'> & { id?: string }
+    data: Omit<Asignatura, 'id' | 'fechaCreacion'> & { id?: string; docenteId?: string; docenteNombre?: string }
   ) => {
     if (data.id) {
       let updatedItem: Asignatura | null = null;
@@ -809,6 +858,8 @@ export default function App() {
             updatedItem = {
               ...item,
               ...data,
+              docenteId: data.docenteId || item.docenteId,
+              docenteNombre: data.docenteNombre || item.docenteNombre,
             };
             return updatedItem;
           }
@@ -821,8 +872,9 @@ export default function App() {
       showToast(`Asignatura "${data.sigla} - ${data.nombre}" guardada correctamente.`);
     } else {
       const newId = `asig-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
-      const teacherId = currentDocente?.id || 'docente-6379';
-      const teacherName = currentDocente?.nombreCompleto || 'Lic. Miguel Antonio Sorich Rojas';
+      const targetDoc = docentes.find((d) => d.id === data.docenteId) || currentDocente;
+      const teacherId = data.docenteId || targetDoc?.id || 'docente-6379';
+      const teacherName = data.docenteNombre || targetDoc?.nombreCompleto || 'Lic. Miguel Antonio Sorich Rojas';
 
       const newSubject: Asignatura = {
         id: newId,
@@ -833,7 +885,7 @@ export default function App() {
       };
       setAsignaturas((prev) => [newSubject, ...prev]);
       saveAsignaturaToSupabase(newSubject);
-      showToast(`Asignatura "${data.sigla} - ${data.nombre}" creada manualmente.`);
+      showToast(`Asignatura "${data.sigla} - ${data.nombre}" asignada a ${teacherName}.`);
     }
   };
 
@@ -1006,6 +1058,12 @@ export default function App() {
             registrosAsistencia={registrosAsistencia}
             adminCredentials={adminCredentials}
             onUpdateAdminCredentials={handleUpdateAdminCredentials}
+            onOpenAddSubjectModal={(doc) => {
+              if (doc) {
+                setCurrentDocente(doc);
+              }
+              handleOpenAddModal();
+            }}
             onExitAdmin={() => setActiveMainTab('MAIN')}
           />
         ) : activeMainTab === 'DOCENTE' ? (
@@ -1134,6 +1192,9 @@ export default function App() {
         onClose={() => setIsFormModalOpen(false)}
         onSave={handleSaveSubject}
         initialData={editingSubject}
+        ofertaAcademica={ofertaAcademica}
+        docentes={docentes}
+        currentDocente={currentDocente}
       />
 
       {/* Import Students Modal */}

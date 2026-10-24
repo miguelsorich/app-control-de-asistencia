@@ -1,18 +1,48 @@
-import React, { useState, useEffect } from 'react';
-import { Asignatura, ModalidadSemanal, SemestreAsignatura } from '../types';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  Asignatura,
+  ModalidadSemanal,
+  SemestreAsignatura,
+  OfertaAcademicaItem,
+  DocenteUsuario,
+} from '../types';
 import {
   calculateEndTime,
   COMMON_TIME_SLOTS_LUN_MIE_VIE,
   COMMON_TIME_SLOTS_MAR_JUE,
   COMMON_TIME_SLOTS_SABADO,
 } from '../utils/timeHelpers';
-import { X, Calendar, Clock, BookOpen, CheckCircle2, AlertCircle, CalendarDays } from 'lucide-react';
+import {
+  X,
+  Calendar,
+  Clock,
+  BookOpen,
+  CheckCircle2,
+  AlertCircle,
+  Search,
+  Sparkles,
+  UserCheck,
+  Building2,
+  GraduationCap,
+  MapPin,
+  ChevronDown,
+  RotateCcw,
+} from 'lucide-react';
 
 interface SubjectFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: Omit<Asignatura, 'id' | 'fechaCreacion'> & { id?: string }) => void;
+  onSave: (
+    data: Omit<Asignatura, 'id' | 'fechaCreacion'> & {
+      id?: string;
+      docenteId?: string;
+      docenteNombre?: string;
+    }
+  ) => void;
   initialData?: Asignatura | null;
+  ofertaAcademica?: OfertaAcademicaItem[];
+  docentes?: DocenteUsuario[];
+  currentDocente?: DocenteUsuario | null;
 }
 
 export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
@@ -20,6 +50,9 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   onClose,
   onSave,
   initialData,
+  ofertaAcademica = [],
+  docentes = [],
+  currentDocente = null,
 }) => {
   const [nombre, setNombre] = useState('');
   const [sigla, setSigla] = useState('');
@@ -30,8 +63,92 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   const [horaInicio, setHoraInicio] = useState('07:00');
   const [horaFin, setHoraFin] = useState('08:30');
   const [aula, setAula] = useState('');
+  const [selectedDocenteId, setSelectedDocenteId] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [autoCalculateEnd, setAutoCalculateEnd] = useState(true);
+
+  // Search & Filter from academic offer catalog
+  const [offerSearchTerm, setOfferSearchTerm] = useState('');
+  const [offerCarreraFilter, setOfferCarreraFilter] = useState<string>('TODAS');
+  const [offerSemestreFilter, setOfferSemestreFilter] = useState<string>('TODOS');
+  const [isOfferDropdownOpen, setIsOfferDropdownOpen] = useState(false);
+  const [selectedOfferItem, setSelectedOfferItem] = useState<OfertaAcademicaItem | null>(null);
+  const offerContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close offer dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        offerContainerRef.current &&
+        !offerContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsOfferDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Unique careers in offer for quick filtering
+  const uniqueCarreras = useMemo(() => {
+    const set = new Set<string>();
+    ofertaAcademica.forEach((o) => {
+      if (o.carrera) set.add(o.carrera);
+    });
+    return Array.from(set).sort();
+  }, [ofertaAcademica]);
+
+  // Filtered offer items for the search dropdown
+  const filteredOfferItems = useMemo(() => {
+    if (!offerSearchTerm.trim() && offerCarreraFilter === 'TODAS' && offerSemestreFilter === 'TODOS') {
+      return ofertaAcademica.slice(0, 15);
+    }
+    const term = offerSearchTerm.toLowerCase().trim();
+    return ofertaAcademica.filter((item) => {
+      if (offerCarreraFilter !== 'TODAS' && item.carrera !== offerCarreraFilter) {
+        return false;
+      }
+      if (offerSemestreFilter !== 'TODOS' && item.semestre.toString() !== offerSemestreFilter) {
+        return false;
+      }
+      if (!term) return true;
+
+      const matchSigla = item.sigla.toLowerCase().includes(term);
+      const matchNombre = item.nombre.toLowerCase().includes(term);
+      const matchGrupo = item.grupo.toLowerCase().includes(term);
+      const matchDocente = (item.docenteAsignadoNombre || '').toLowerCase().includes(term);
+      const matchDocId = (item.docenteAsignadoId || '').toLowerCase().includes(term);
+      const matchCarrera = (item.carrera || '').toLowerCase().includes(term);
+
+      return (
+        matchSigla ||
+        matchNombre ||
+        matchGrupo ||
+        matchDocente ||
+        matchDocId ||
+        matchCarrera
+      );
+    });
+  }, [ofertaAcademica, offerSearchTerm, offerCarreraFilter, offerSemestreFilter]);
+
+  // Unique siglas and names for native datalists
+  const uniqueSiglas = useMemo(() => {
+    const set = new Set<string>();
+    ofertaAcademica.forEach((o) => {
+      if (o.sigla) set.add(o.sigla.trim().toUpperCase());
+    });
+    return Array.from(set).sort();
+  }, [ofertaAcademica]);
+
+  const uniqueNombres = useMemo(() => {
+    const set = new Set<string>();
+    ofertaAcademica.forEach((o) => {
+      if (o.nombre) set.add(o.nombre.trim());
+    });
+    return Array.from(set).sort();
+  }, [ofertaAcademica]);
 
   // Populate or reset form when modal opens or initialData changes
   useEffect(() => {
@@ -46,7 +163,9 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         setHoraInicio(initialData.horaInicio);
         setHoraFin(initialData.horaFin);
         setAula(initialData.aula || '');
+        setSelectedDocenteId(initialData.docenteId || currentDocente?.id || '');
         setAutoCalculateEnd(false);
+        setSelectedOfferItem(null);
       } else {
         setNombre('');
         setSigla('');
@@ -57,11 +176,58 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
         setHoraInicio('07:00');
         setHoraFin('08:30');
         setAula('');
+        setSelectedDocenteId(currentDocente?.id || (docentes[0]?.id || 'docente-6379'));
         setAutoCalculateEnd(true);
+        setSelectedOfferItem(null);
       }
+      setOfferSearchTerm('');
+      setOfferCarreraFilter('TODAS');
+      setOfferSemestreFilter('TODOS');
+      setIsOfferDropdownOpen(false);
       setErrors({});
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData, currentDocente, docentes]);
+
+  // Select an offer item and auto-fill form fields
+  const handleSelectOfferItem = (item: OfertaAcademicaItem) => {
+    setSelectedOfferItem(item);
+    setNombre(item.nombre);
+    setSigla(item.sigla);
+    setGrupo(item.grupo);
+    setSemestre(item.semestre === 2 ? 2 : 1);
+    setAño(item.año || 2026);
+    setModalidad(item.modalidad || 'LUN_MIE_VIE');
+    setHoraInicio(item.horaInicio || '07:00');
+    setHoraFin(item.horaFin || '08:30');
+    setAula(item.aula || '');
+    setAutoCalculateEnd(false);
+
+    // Try to auto-match assigned docente in the registered docentes list
+    if (item.docenteAsignadoId || item.docenteAsignadoNombre) {
+      const docCode = (item.docenteAsignadoId || '').toLowerCase().trim();
+      const docName = (item.docenteAsignadoNombre || '').toLowerCase().trim();
+
+      const matchedDoc = docentes.find((d) => {
+        const dCode = d.codigoDocente.toLowerCase().trim();
+        const dName = d.nombreCompleto.toLowerCase().trim();
+        return (
+          (docCode && (dCode === docCode || docCode.includes(dCode) || dCode.includes(docCode))) ||
+          (docName && (dName === docName || docName.includes(dName) || dName.includes(docName)))
+        );
+      });
+
+      if (matchedDoc) {
+        setSelectedDocenteId(matchedDoc.id);
+      }
+    }
+
+    setIsOfferDropdownOpen(false);
+    setErrors({});
+  };
+
+  const handleClearOfferSelection = () => {
+    setSelectedOfferItem(null);
+  };
 
   // Recalculate end time when modality changes if autoCalculateEnd is enabled
   const handleModalidadChange = (newMod: ModalidadSemanal) => {
@@ -127,6 +293,8 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
     e.preventDefault();
     if (!validate()) return;
 
+    const assignedDoc = docentes.find((d) => d.id === selectedDocenteId) || currentDocente;
+
     onSave({
       ...(initialData?.id ? { id: initialData.id } : {}),
       nombre: nombre.trim(),
@@ -138,6 +306,10 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
       horaInicio,
       horaFin,
       aula: aula.trim(),
+      docenteId: assignedDoc?.id,
+      docenteNombre: assignedDoc?.nombreCompleto,
+      origenOfertaId: selectedOfferItem?.id,
+      carrera: selectedOfferItem?.carrera,
     });
     onClose();
   };
@@ -160,24 +332,36 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
   return (
     <div
       id="modal-backdrop"
-      className="fixed inset-0 z-50 overflow-y-auto bg-[#172033]/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-50 overflow-y-auto bg-[#172033]/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6"
     >
+      {/* Datalists for native browser autocomplete suggestions */}
+      <datalist id="oferta-siglas-datalist">
+        {uniqueSiglas.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+      <datalist id="oferta-nombres-datalist">
+        {uniqueNombres.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+
       <div
         id="modal-container"
-        className="bg-white rounded-2xl shadow-2xl border border-[#DCE3EC] w-full max-w-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="bg-white rounded-2xl shadow-2xl border border-[#DCE3EC] w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
       >
         {/* Modal Header */}
-        <div className="bg-[#174EAF] px-6 py-4.5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-white">
-              <BookOpen className="w-4 h-4" />
+        <div className="bg-[#174EAF] px-5 sm:px-6 py-4 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-white border border-white/20">
+              <BookOpen className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">
-                {initialData ? 'Editar Asignatura' : 'Agregar Nueva Asignatura'}
+              <h2 className="text-base sm:text-lg font-bold">
+                {initialData ? 'Editar Asignatura' : 'Agregar / Asignar Asignatura'}
               </h2>
-              <p className="text-xs text-[#E8F0FC]/80">
-                Complete la información requerida para el registro
+              <p className="text-xs text-[#E8F0FC]/90">
+                Filtra desde el Maestro de Oferta o completa los datos manualmente
               </p>
             </div>
           </div>
@@ -192,8 +376,221 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
           </button>
         </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        {/* Modal Body (Scrollable) */}
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1">
+          {/* ========================================================= */}
+          {/* SECTOR 1: BUSCADOR Y FILTROS DEL MAESTRO DE OFERTA       */}
+          {/* ========================================================= */}
+          {ofertaAcademica.length > 0 && !initialData && (
+            <div
+              ref={offerContainerRef}
+              className="bg-blue-50/50 border border-blue-200 rounded-2xl p-3.5 sm:p-4 space-y-2.5 relative"
+            >
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-[#174EAF] text-white">
+                    <Sparkles className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h4 className="text-xs font-bold text-[#172033] uppercase tracking-wider">
+                      Autocompletar desde el Maestro de Oferta
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Filtra por sigla (ej. CPA500), nombre o docente para rellenar los datos al instante
+                    </p>
+                  </div>
+                </div>
+
+                {selectedOfferItem && (
+                  <button
+                    type="button"
+                    onClick={handleClearOfferSelection}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#174EAF] hover:text-[#103B88] bg-white px-2 py-1 rounded-md border border-blue-200 cursor-pointer shadow-2xs"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Limpiar selección</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Filters Bar: Search text + Carrera + Semestre */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <div className="sm:col-span-6 relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={offerSearchTerm}
+                    onChange={(e) => {
+                      setOfferSearchTerm(e.target.value);
+                      setIsOfferDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsOfferDropdownOpen(true)}
+                    placeholder="Buscar sigla (CPA500), materia o docente..."
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#174EAF] text-slate-900"
+                  />
+                  {offerSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setOfferSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                <div className="sm:col-span-4">
+                  <select
+                    value={offerCarreraFilter}
+                    onChange={(e) => {
+                      setOfferCarreraFilter(e.target.value);
+                      setIsOfferDropdownOpen(true);
+                    }}
+                    className="w-full py-1.5 px-2 text-xs bg-white border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#174EAF] text-slate-700"
+                  >
+                    <option value="TODAS">Todas las Carreras</option>
+                    {uniqueCarreras.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <select
+                    value={offerSemestreFilter}
+                    onChange={(e) => {
+                      setOfferSemestreFilter(e.target.value);
+                      setIsOfferDropdownOpen(true);
+                    }}
+                    className="w-full py-1.5 px-2 text-xs bg-white border border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#174EAF] text-slate-700"
+                  >
+                    <option value="TODOS">Semestre</option>
+                    <option value="1">Sem. 1</option>
+                    <option value="2">Sem. 2</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Live Offer Dropdown Suggestions */}
+              {isOfferDropdownOpen && (
+                <div className="absolute left-3.5 right-3.5 top-full mt-1 z-30 bg-white rounded-xl border border-slate-200 shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100">
+                  <div className="p-2 bg-slate-50 text-[11px] font-semibold text-slate-500 flex items-center justify-between">
+                    <span>
+                      {filteredOfferItems.length} asignaturas encontradas en la oferta
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsOfferDropdownOpen(false)}
+                      className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+                  {filteredOfferItems.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-slate-500 italic">
+                      No se encontraron asignaturas con ese filtro en la oferta.
+                    </div>
+                  ) : (
+                    filteredOfferItems.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => handleSelectOfferItem(item)}
+                        className="p-2.5 hover:bg-blue-50/80 cursor-pointer transition-colors flex items-start justify-between gap-2"
+                      >
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-bold text-xs bg-blue-100 text-[#174EAF] px-1.5 py-0.2 rounded">
+                              {item.sigla}
+                            </span>
+                            <span className="font-bold text-xs text-slate-800 bg-slate-100 px-1.5 py-0.2 rounded">
+                              Grp {item.grupo}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-semibold">
+                              Sem. {item.semestre}
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold text-slate-900 truncate">
+                            {item.nombre}
+                          </p>
+                          <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+                            {item.docenteAsignadoNombre && (
+                              <span className="text-[#174EAF] font-medium">
+                                Doc: {item.docenteAsignadoNombre}
+                                {item.docenteAsignadoId && ` (${item.docenteAsignadoId})`}
+                              </span>
+                            )}
+                            <span>•</span>
+                            <span>{item.diasTexto || item.modalidad}</span>
+                            <span>•</span>
+                            <span className="font-mono">{item.horarioTexto || `${item.horaInicio}-${item.horaFin}`}</span>
+                            {item.aula && <span>• Aula {item.aula}</span>}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="shrink-0 px-2 py-1 text-[11px] font-bold text-white bg-[#174EAF] hover:bg-[#103B88] rounded-md shadow-2xs cursor-pointer"
+                        >
+                          Cargar
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Visual Confirmation Banner if an offer item is loaded */}
+              {selectedOfferItem && (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Datos cargados de: <strong>{selectedOfferItem.sigla} - Grp {selectedOfferItem.grupo}</strong> ({selectedOfferItem.nombre})
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-200/60 px-2 py-0.5 rounded text-emerald-900">
+                    Oferta Vinculada
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* SECTOR 2: ASIGNACIÓN DE DOCENTE                           */}
+          {/* ========================================================= */}
+          {docentes.length > 0 && (
+            <div className="bg-slate-50 p-3.5 rounded-xl border border-[#DCE3EC] space-y-1.5">
+              <label
+                htmlFor="select-docente-asignado"
+                className="block text-xs font-bold text-[#172033] uppercase tracking-wider flex items-center gap-1.5"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-[#174EAF]" />
+                <span>Docente Asignado a la Asignatura <span className="text-red-500">*</span></span>
+              </label>
+              <select
+                id="select-docente-asignado"
+                value={selectedDocenteId}
+                onChange={(e) => setSelectedDocenteId(e.target.value)}
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-[#DCE3EC] rounded-xl focus:ring-2 focus:ring-[#174EAF] focus:outline-none font-medium text-slate-800"
+              >
+                {docentes.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nombreCompleto} (Cod: {d.codigoDocente}) — {d.carrera || 'Facultad General'}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-500">
+                La materia aparecerá directamente en el portal del docente seleccionado.
+              </p>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* SECTOR 3: DATOS DE LA ASIGNATURA                          */}
+          {/* ========================================================= */}
           {/* Nombre de la asignatura */}
           <div>
             <label
@@ -205,15 +602,15 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
             <input
               id="input-nombre"
               type="text"
+              list="oferta-nombres-datalist"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
-              placeholder="Ej. Estructuras de Datos I, Cálculo I, Redes I"
+              placeholder="Ej. AUDITORIA IMPOSITIVA, CONTABILIDAD BASICA I, CALCULO I"
               className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${
                 errors.nombre
                   ? 'border-red-400 focus:ring-red-400 focus:border-red-500 bg-red-50/20'
                   : 'border-[#DCE3EC] focus:ring-[#174EAF] focus:border-[#174EAF]'
               } focus:outline-none focus:ring-2 transition-all`}
-              autoFocus
             />
             {errors.nombre && (
               <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
@@ -236,14 +633,15 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
                 <input
                   id="input-sigla"
                   type="text"
+                  list="oferta-siglas-datalist"
                   value={sigla}
-                  onChange={(e) => setSigla(e.target.value)}
-                  placeholder="Ej. INF210, MAT101"
+                  onChange={(e) => setSigla(e.target.value.toUpperCase())}
+                  placeholder="Ej. CPA500, MAT101, INF210"
                   className={`w-full uppercase px-3.5 py-2.5 text-sm rounded-xl border ${
                     errors.sigla
                       ? 'border-red-400 focus:ring-red-400 focus:border-red-500 bg-red-50/20'
                       : 'border-[#DCE3EC] focus:ring-[#174EAF] focus:border-[#174EAF]'
-                  } focus:outline-none focus:ring-2 transition-all font-mono font-medium`}
+                  } focus:outline-none focus:ring-2 transition-all font-mono font-bold`}
                 />
               </div>
               {errors.sigla && (
@@ -266,13 +664,13 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
                   id="input-grupo"
                   type="text"
                   value={grupo}
-                  onChange={(e) => setGrupo(e.target.value)}
-                  placeholder="Ej. SA, SB, SC, Z1"
+                  onChange={(e) => setGrupo(e.target.value.toUpperCase())}
+                  placeholder="Ej. B, HL, L, MI, SA, SB"
                   className={`w-full uppercase px-3.5 py-2.5 text-sm rounded-xl border ${
                     errors.grupo
                       ? 'border-red-400 focus:ring-red-400 focus:border-red-500 bg-red-50/20'
                       : 'border-[#DCE3EC] focus:ring-[#174EAF] focus:border-[#174EAF]'
-                  } focus:outline-none focus:ring-2 transition-all font-medium`}
+                  } focus:outline-none focus:ring-2 transition-all font-bold`}
                 />
               </div>
               {errors.grupo && (
@@ -284,7 +682,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
             </div>
           </div>
 
-          {/* Semestre y Año Académico (Nuevos campos obligatorios) */}
+          {/* Semestre y Año Académico */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-[#F5F7FA] p-3.5 rounded-xl border border-[#DCE3EC]">
             <div>
               <label
@@ -348,7 +746,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
                     errors.año
                       ? 'border-red-400 focus:ring-red-400 focus:border-red-500 bg-red-50/20'
                       : 'border-[#DCE3EC] focus:ring-[#174EAF] focus:border-[#174EAF]'
-                  } focus:outline-none focus:ring-2 transition-all font-mono font-medium bg-white`}
+                  } focus:outline-none focus:ring-2 transition-all font-mono`}
                 />
               </div>
               {errors.año && (
@@ -362,15 +760,11 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
 
           {/* Modalidad Semanal */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-bold text-[#172033] uppercase tracking-wider">
-                Modalidad Semanal <span className="text-red-500">*</span>
-              </label>
-              <span className="text-xs text-[#667085]">Seleccione los días de clase</span>
-            </div>
-
+            <label className="block text-xs font-bold text-[#172033] uppercase tracking-wider mb-2">
+              Modalidad Semanal <span className="text-red-500">*</span>
+            </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Option 1: Lunes, miércoles y viernes */}
+              {/* Option 1: Lun, Mié y Vie */}
               <button
                 id="btn-mod-lun-mie-vie"
                 type="button"
@@ -547,7 +941,7 @@ export const SubjectFormModal: React.FC<SubjectFormModalProps> = ({
                 type="text"
                 value={aula}
                 onChange={(e) => setAula(e.target.value)}
-                placeholder="Ej. Aula 236-04, Lab. Computación 2, Edif. 224"
+                placeholder="Ej. 21410, Aula 236-04, Lab. Computación 2, Edif. 224"
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-[#DCE3EC] focus:ring-2 focus:ring-[#174EAF] focus:border-[#174EAF] focus:outline-none transition-all"
               />
             </div>

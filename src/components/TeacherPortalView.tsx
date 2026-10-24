@@ -1157,6 +1157,8 @@ export const TeacherPortalView: React.FC<TeacherPortalViewProps> = ({
           ofertaAcademica={ofertaAcademica}
           existingAsignaturas={asignaturas}
           currentDocenteId={currentTeacher?.id}
+          currentDocente={currentTeacher}
+          docentes={docentes}
           onSelectOfertaItem={(item) => {
             if (onSelectOfertaItem) {
               onSelectOfertaItem(item);

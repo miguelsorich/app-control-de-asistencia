@@ -58,6 +58,7 @@ interface AdminPortalViewProps {
   adminCredentials?: AdminCredentials;
   onUpdateAdminCredentials?: (creds: AdminCredentials) => void;
   onAssignOfertaToTeacher?: (ofertaId: string, docenteId: string) => void;
+  onOpenAddSubjectModal?: (docente?: DocenteUsuario) => void;
   onExitAdmin: () => void;
 }
 
@@ -78,6 +79,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
   adminCredentials = { username: 'admin', password: '0715' },
   onUpdateAdminCredentials,
   onAssignOfertaToTeacher,
+  onOpenAddSubjectModal,
   onExitAdmin,
 }) => {
   const [activeTab, setActiveTab] = useState<'DOCENTES' | 'OFERTA' | 'SUPERVISION' | 'HISTORIAL'>('DOCENTES');
@@ -286,14 +288,27 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsAddDocenteOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#174EAF] hover:bg-[#103B88] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs self-start sm:self-auto"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>+ Crear Nuevo Docente</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                {onOpenAddSubjectModal && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenAddSubjectModal()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                    title="Crear una asignatura y asignarla a un docente con filtros del Maestro de Oferta"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Asignar / Crear Materia</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsAddDocenteOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#174EAF] hover:bg-[#103B88] text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>+ Crear Nuevo Docente</span>
+                </button>
+              </div>
             </div>
 
             {/* Docentes Table */}
@@ -384,6 +399,16 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
                           >
                             {doc.activo ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                           </button>
+                          {onOpenAddSubjectModal && (
+                            <button
+                              type="button"
+                              onClick={() => onOpenAddSubjectModal(doc)}
+                              className="p-1.5 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                              title={`Crear o asignar asignatura a ${doc.nombreCompleto}`}
+                            >
+                              <BookOpen className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => setEditingDocente(doc)}
