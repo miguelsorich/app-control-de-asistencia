@@ -738,6 +738,7 @@ export const AdminPortalView: React.FC<AdminPortalViewProps> = ({
         onClose={() => setIsAddDocenteOpen(false)}
         onSaveDocente={onSaveDocente}
         existingDocentes={docentes}
+        ofertaAcademica={ofertaAcademica}
       />
 
       <AdminEditDocenteModal
